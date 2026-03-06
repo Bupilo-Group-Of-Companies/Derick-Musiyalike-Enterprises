@@ -1,0 +1,113 @@
+{
+  "servers": [
+    {
+      "id": "1",
+      "name": "Gemini Flash 3",
+      "url": "https://api.google.com/gemini",
+      "status": "online",
+      "model": "gemini-3-flash",
+      "type": "text"
+    },
+    {
+      "id": "2",
+      "name": "OpenAI GPT-4o Free",
+      "url": "https://api.openai.com/v1",
+      "status": "online",
+      "model": "gpt-4o",
+      "type": "text"
+    },
+    {
+      "id": "3",
+      "name": "Stable Diffusion XL",
+      "url": "https://api.stability.ai",
+      "status": "maintenance",
+      "model": "sdxl-1.0",
+      "type": "image"
+    }
+  ],
+  "users": [
+    {
+      "id": 2,
+      "name": "Jack Admin",
+      "email": "jackadmin@moneylink.com",
+      "password": "jackadmin123"
+    }
+  ],
+  "admins": [],
+  "appRequests": [],
+  "agents": [],
+  "meetings": [],
+  "streamingApps": [
+    {
+      "id": "airtel-momo",
+      "name": "Airtel Money System",
+      "url": "https://www.airtel.co.zm/airtelmoney",
+      "category": "developer",
+      "status": "online",
+      "icon": "Smartphone"
+    },
+    {
+      "id": "mtn-momo",
+      "name": "MTN MoMo System",
+      "url": "https://www.mtn.zm/momo",
+      "category": "developer",
+      "status": "online",
+      "icon": "Smartphone"
+    },
+    {
+      "id": "zamtel-kwacha",
+      "name": "Zamtel Kwacha System",
+      "url": "https://www.zamtel.zm/zamtelkwacha",
+      "category": "developer",
+      "status": "online",
+      "icon": "Smartphone"
+    },
+    {
+      "id": "airtel-momo-admin",
+      "name": "Airtel Money System",
+      "url": "https://www.airtel.co.zm/airtelmoney",
+      "category": "admin",
+      "status": "online",
+      "icon": "Smartphone"
+    },
+    {
+      "id": "mtn-momo-admin",
+      "name": "MTN MoMo System",
+      "url": "https://www.mtn.zm/momo",
+      "category": "admin",
+      "status": "online",
+      "icon": "Smartphone"
+    },
+    {
+      "id": "zamtel-kwacha-admin",
+      "name": "Zamtel Kwacha System",
+      "url": "https://www.zamtel.zm/zamtelkwacha",
+      "category": "admin",
+      "status": "online",
+      "icon": "Smartphone"
+    }
+  ],
+  "tools": [
+    {
+      "id": "sim-reg",
+      "name": "SIM Registration Portal",
+      "description": "Official portal for biometric SIM registration and verification.",
+      "url": "https://simreg.zicta.zm",
+      "status": "active",
+      "icon": "UserPlus"
+    }
+  ],
+  "agentRequests": [
+    {
+      "name": "Derick",
+      "phone": "0974687710",
+      "email": "apostlederick51@gmail.com",
+      "adminId": "",
+      "status": "pending",
+      "createdAt": "2026-03-02T15:15:20.871Z",
+      "id": "1772464527868"
+    }
+  ],
+  "transactions": [],
+  "systemConfig": {}
+}
