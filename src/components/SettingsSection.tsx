@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Moon, Sun, Terminal, ShieldCheck, X as CloseIcon, Users } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Terminal, ShieldCheck, X as CloseIcon, Users, Info } from 'lucide-react';
 import { Section } from '../types';
+import AppIconViewer from './AppIconViewer';
 
 interface SettingsSectionProps {
   onBack: () => void;
@@ -15,7 +16,9 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
   const [devUsername, setDevUsername] = useState('');
   const [devPassword, setDevPassword] = useState('');
   const [devError, setDevError] = useState('');
+  const [showIconViewer, setShowIconViewer] = useState(false);
   const [config, setConfig] = useState<any>({
+    appName: 'MoneyLink',
     appLogo: 'https://storage.googleapis.com/static.aistudio.google.com/content/2026/02/25/08/46/27/95/96/image.png'
   });
 
@@ -23,6 +26,9 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
     const storedConfig = JSON.parse(localStorage.getItem('moneylink_config') || '{}');
     if (storedConfig.appLogo) {
       setConfig((prev: any) => ({ ...prev, appLogo: storedConfig.appLogo }));
+    }
+    if (storedConfig.appName) {
+      setConfig((prev: any) => ({ ...prev, appName: storedConfig.appName }));
     }
   }, []);
 
@@ -72,6 +78,27 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">
+        <h3 className="font-bold text-sm mb-4">About App</h3>
+        <button 
+          onClick={() => setShowIconViewer(true)}
+          className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
+              <img src={config.appLogo} alt="App Icon" className="w-full h-full object-cover" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-sm text-gray-900">App Icon</p>
+              <p className="text-[10px] text-gray-500 font-medium">View & Download Asset</p>
+            </div>
+          </div>
+          <div className="p-2 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+            <Info className="w-4 h-4 text-gray-400" />
+          </div>
+        </button>
       </div>
 
       <div className="pt-4">
@@ -172,6 +199,14 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
           </div>
         </div>
       )}
+
+      {/* App Icon Viewer Modal */}
+      <AppIconViewer 
+        isOpen={showIconViewer}
+        onClose={() => setShowIconViewer(false)}
+        iconUrl={config.appLogo}
+        appName={config.appName}
+      />
     </div>
   );
 };

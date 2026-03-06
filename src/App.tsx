@@ -144,7 +144,8 @@ const App: React.FC = () => {
       primaryColor: isPartner ? '#1e3a8a' : '#15803d',
       maintenanceMode: false,
       twoFactorEnabled: true,
-      biometricEnabled: true
+      biometricEnabled: true,
+      version: '1.0.0'
     };
     
     if (isPartner) {
@@ -265,7 +266,7 @@ const App: React.FC = () => {
       case 'my-loans':
         return <LoanSection onBack={() => setActiveSection('home')} isRegistered={!!currentUser} config={config} />;
       case 'digital-services':
-        return <DigitalServices onBack={() => setActiveSection('home')} currentUser={currentUser} onUpdateUser={handleLogin} config={config} />;
+        return <DigitalServices onBack={() => setActiveSection('home')} currentUser={currentUser} onUpdateUser={handleLogin} config={config} onNavigate={setActiveSection} />;
       case 'account':
         return <AccountSection onBack={() => setActiveSection('home')} onLogout={handleLogout} currentUser={currentUser} onNavigate={setActiveSection} config={config} />;
       case 'trust':

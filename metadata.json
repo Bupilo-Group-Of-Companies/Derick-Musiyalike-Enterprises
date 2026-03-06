@@ -1,5 +1,7 @@
 {
   "name": "MoneyLink Financial",
-  "description": "A comprehensive financial management application with AI-powered advisory, loan management, and digital services.",
-  "requestFramePermissions": []
+  "description": "The ultimate financial management platform for loans, savings, and digital services.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

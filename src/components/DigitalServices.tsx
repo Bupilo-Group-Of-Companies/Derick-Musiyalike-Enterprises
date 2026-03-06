@@ -26,21 +26,20 @@ import {
   Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SystemConfig, RecurringPayment, User } from '../types';
-
-import LightbulbTips from './LightbulbTips';
+import { SystemConfig, RecurringPayment, User, Section } from '../types';
+import CryptoWallet from './CryptoWallet';
 
 interface DigitalServicesProps {
   onBack: () => void;
   currentUser: User | null;
   onUpdateUser: (user: User) => void;
   config: SystemConfig;
+  onNavigate: (section: Section) => void;
 }
 
-const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, onUpdateUser, config }) => {
+const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, onUpdateUser, config, onNavigate }) => {
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [showTips, setShowTips] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [billAmount, setBillAmount] = useState('');
   const [billAccount, setBillAccount] = useState('');
@@ -50,6 +49,7 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>([]);
+  const [showCryptoWallet, setShowCryptoWallet] = useState(false);
 
   useEffect(() => {
     const fetchRecurringPayments = async () => {
@@ -224,8 +224,8 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
 
   const services = [
     { id: 'pay-bills', label: 'Pay Bills', icon: CreditCard, desc: 'Electricity, Water, TV', action: () => document.getElementById('quick-pay')?.scrollIntoView({ behavior: 'smooth' }) },
-    { id: 'history', label: 'Transaction History', icon: History, desc: 'Track your spending', action: () => alert('History feature coming soon') },
-    { id: 'advisory', label: 'Business Advisory', icon: Lightbulb, desc: 'Expert financial tips', action: () => setShowTips(true) },
+    { id: 'history', label: 'Transaction History', icon: History, desc: 'Track your spending', action: () => onNavigate('transactions') },
+    { id: 'advisory', label: 'Business Advisory', icon: Lightbulb, desc: 'Expert financial tips', action: () => alert('Advisory feature coming soon') },
     { id: 'investment', label: 'Investment Plans', icon: TrendingUp, desc: 'Grow your wealth', action: () => alert('Investment feature coming soon') },
     { id: 'partner', label: 'Partner With Us', icon: Handshake, desc: 'Business opportunities', action: () => alert('Partner feature coming soon') },
     { id: 'remittance', label: 'International Remittance', icon: Smartphone, desc: 'Send money abroad', action: () => alert('Remittance feature coming soon') },
@@ -284,6 +284,16 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
                 <span className="text-[10px] font-bold text-[#666]">{bill.name}</span>
               </button>
             ))}
+            {/* Crypto Wallet Button */}
+            <button 
+              onClick={() => setShowCryptoWallet(true)}
+              className="flex flex-col items-center gap-2 group"
+            >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 text-orange-600 bg-orange-50 border border-[#F0F0F0]">
+                <Bitcoin className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-bold text-[#666]">Crypto</span>
+            </button>
           </div>
         </div>
 
@@ -336,7 +346,36 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
         </div>
       </div>
 
-
+      {/* Free Apps Section */}
+      <div className="bg-blue-600 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl shadow-blue-600/20">
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+              <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+              <h3 className="text-xl font-black tracking-tight uppercase">Free Online Apps</h3>
+            </div>
+            <p className="text-blue-100 text-xs leading-relaxed max-w-[300px]">
+              Access premium apps and social media for free without data or bundles. Powered by DMI Free Internet Servers.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => openBrowser('https://derickmusiyalike.com')}
+              className="bg-white text-blue-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-transform"
+            >
+              Open Browser
+            </button>
+            <button 
+              onClick={() => openBrowser('https://facebook.com')}
+              className="bg-blue-700 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-transform border border-blue-500"
+            >
+              Facebook
+            </button>
+          </div>
+        </div>
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl"></div>
+      </div>
 
       {/* Main Services List */}
       <div className="space-y-3">
@@ -357,9 +396,6 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
           </button>
         ))}
       </div>
-
-      {/* Lightbulb Tips Modal */}
-      <LightbulbTips isOpen={showTips} onClose={() => setShowTips(false)} />
 
       {/* Bill Payment Modal */}
       <AnimatePresence>
@@ -533,6 +569,16 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Crypto Wallet Modal */}
+      <AnimatePresence>
+        {showCryptoWallet && (
+          <CryptoWallet 
+            isOpen={showCryptoWallet} 
+            onClose={() => setShowCryptoWallet(false)} 
+          />
         )}
       </AnimatePresence>
 

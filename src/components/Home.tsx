@@ -277,12 +277,12 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
     { id: 'check-status', label: 'Check Loan Status', icon: Search, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => onNavigate('my-loans') },
     { id: 'repay-loan', label: 'Repay Loan', icon: CreditCard, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => currentUser ? setShowRepayModal(true) : setShowLoginFlow(true) },
     { id: 'agent', label: 'Agent Access', icon: Headphones, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: onAgentLogin },
-    { id: 'mobile-money', label: 'Mobile Money', icon: Smartphone, color: 'bg-white', textColor: 'text-[#1A1A1A]' },
+    { id: 'mobile-money', label: 'Mobile Money', icon: Smartphone, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => onNavigate('digital-services') },
     { id: 'rewards', label: 'Loyalty Rewards', icon: Gift, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => alert('Rewards Points: 250 ML Points') },
-    { id: 'digital-services', label: 'Invest with Us', icon: TrendingUp, color: 'bg-white', textColor: 'text-[#1A1A1A]' },
+    { id: 'digital-services', label: 'Invest with Us', icon: TrendingUp, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => onNavigate('digital-services') },
     { id: 'live-meeting', label: 'Live Support', icon: Video, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => currentUser ? setShowLiveMeeting(true) : setShowLoginFlow(true) },
     { id: 'ai-lab', label: 'Gemini AI Lab', icon: Sparkles, color: 'bg-emerald-50', textColor: 'text-emerald-700', onClick: () => onNavigate('ai-lab') },
-    { id: 'account', label: 'My Account', icon: UserIcon, color: 'bg-white', textColor: 'text-[#1A1A1A]' },
+    { id: 'account', label: 'My Account', icon: UserIcon, color: 'bg-white', textColor: 'text-[#1A1A1A]', onClick: () => onNavigate('account') },
   ];
 
   if (!config) {
@@ -547,7 +547,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
 
       {/* Quick Actions */}
       <div className="grid grid-cols-3 gap-4">
-        <QuickActionButton icon={Smartphone} label="Scan to Pay" onClick={() => alert("Scan to Pay feature coming soon!")} />
+        <QuickActionButton icon={Smartphone} label="Scan to Pay" onClick={() => onNavigate('digital-services')} />
         <QuickActionButton icon={Wallet} label="Top Up Wallet" onClick={() => onNavigate('account')} />
         <QuickActionButton icon={Target} label="Share & Earn" onClick={handleReferAndEarn} />
       </div>
