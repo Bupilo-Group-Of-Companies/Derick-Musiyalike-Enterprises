@@ -27,6 +27,7 @@ import RegistrationFlow from './RegistrationFlow';
 import LoginFlow from './LoginFlow';
 import QuickActionButton from './QuickActionButton';
 import LiveMeeting from './LiveMeeting';
+import SupportChat from './SupportChat';
 
 interface HomeProps {
   onNavigate: (section: Section) => void;
@@ -647,32 +648,15 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
       {/* Recent Activity List */}
       <DataList transactions={transactions} title="Recent Transactions" />
 
-      {/* Developer Credit Footer */}
-      <div className="pt-12 pb-8 text-center space-y-4">
-        <div className="flex items-center justify-center gap-2 text-[#999]">
-          <div className="h-px w-8 bg-[#E5E5E5]"></div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Developed By</p>
-          <div className="h-px w-8 bg-[#E5E5E5]"></div>
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-sm font-black text-[#1A1A1A]">DERICK MUSIYALIKE INSTITUTION</h3>
-          <p className="text-[10px] text-[#666] font-medium">Lusaka, Zambia</p>
-        </div>
-        <div className="flex justify-center gap-6">
-          <a href="mailto:derickmusiyalikeinstitution@gmail.com" className="flex items-center gap-1.5 text-[10px] font-bold text-green-700 hover:underline">
-            <span className="w-1.5 h-1.5 bg-green-700 rounded-full"></span>
-            EMAIL
-          </a>
-          <a href="https://wa.me/260774218141" className="flex items-center gap-1.5 text-[10px] font-bold text-green-700 hover:underline">
-            <span className="w-1.5 h-1.5 bg-green-700 rounded-full"></span>
-            WHATSAPP 1
-          </a>
-          <a href="https://wa.me/260777382032" className="flex items-center gap-1.5 text-[10px] font-bold text-green-700 hover:underline">
-            <span className="w-1.5 h-1.5 bg-green-700 rounded-full"></span>
-            WHATSAPP 2
-          </a>
-        </div>
+      {/* WhatsApp Support */}
+      <div className="pt-8 pb-8 text-center">
+        <a href="https://wa.me/260777382032" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-6 py-3 rounded-2xl font-bold text-sm hover:bg-green-100 transition-colors">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          WhatsApp: +260 777382032
+        </a>
       </div>
+
+      <SupportChat currentUser={currentUser} role="user" config={config} />
     </div>
   );
 };

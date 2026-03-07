@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Moon, Sun, Terminal, ShieldCheck, X as CloseIcon, Users, Info } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Terminal, ShieldCheck, X as CloseIcon, Users, Info, Download } from 'lucide-react';
 import { Section } from '../types';
 import AppIconViewer from './AppIconViewer';
+import { useZoom } from '../contexts/ZoomContext';
 
 interface SettingsSectionProps {
   onBack: () => void;
@@ -17,6 +18,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
   const [devPassword, setDevPassword] = useState('');
   const [devError, setDevError] = useState('');
   const [showIconViewer, setShowIconViewer] = useState(false);
+  const { zoom, setZoom } = useZoom();
   const [config, setConfig] = useState<any>({
     appName: 'MoneyLink',
     appLogo: 'https://storage.googleapis.com/static.aistudio.google.com/content/2026/02/25/08/46/27/95/96/image.png'
@@ -63,7 +65,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
 
       <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">
         <h3 className="font-bold text-sm mb-4">Appearance</h3>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <p className="font-medium text-sm">Theme</p>
           <div className="flex items-center gap-2">
             <button 
@@ -78,9 +80,20 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
             </button>
           </div>
         </div>
+        <h3 className="font-bold text-sm mb-4">Zoom Level</h3>
+        <input 
+          type="range" 
+          min="0.5" 
+          max="1.5" 
+          step="0.1" 
+          value={zoom} 
+          onChange={(e) => setZoom(parseFloat(e.target.value))} 
+          className="w-full"
+        />
+        <p className="text-xs text-[#666] mt-2">Current Zoom: {Math.round(zoom * 100)}%</p>
       </div>
 
-      <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">
+      <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm space-y-4">
         <h3 className="font-bold text-sm mb-4">About App</h3>
         <button 
           onClick={() => setShowIconViewer(true)}
@@ -99,14 +112,40 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
             <Info className="w-4 h-4 text-gray-400" />
           </div>
         </button>
+
+        {config.downloadUrl && (
+          <a 
+            href={config.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-between p-4 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                <Download className="w-6 h-6" />
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-sm text-blue-900">Download APK</p>
+                <p className="text-[10px] text-blue-600 font-medium">Get the latest Android app</p>
+              </div>
+            </div>
+            <div className="p-2 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+              <ArrowLeft className="w-4 h-4 text-blue-600 rotate-[135deg]" />
+            </div>
+          </a>
+        )}
       </div>
 
       <div className="pt-4">
         <div className="w-full bg-green-700 text-white p-6 rounded-[2rem] shadow-lg shadow-green-700/20 transition-all group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-2xl">
-                <Users className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center overflow-hidden">
+                {config.dmiLogo ? (
+                  <img src={config.dmiLogo} alt="DMI Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Users className="w-6 h-6 text-white" />
+                )}
               </div>
               <div className="text-left">
                 <p className="font-black text-lg tracking-tight">Join The DMI Group</p>
@@ -125,22 +164,20 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
             </button>
           </div>
 
-          {isPartner && (
-            <div className="mt-6 pt-6 border-t border-white/10">
-              <button 
-                onClick={() => setShowDevLogin(true)}
-                className="w-full p-4 flex items-center justify-between bg-white/10 hover:bg-white/20 transition-colors group/dev rounded-2xl border border-white/10"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-2.5 bg-white/20 text-white rounded-xl group-hover/dev:bg-white group-hover/dev:text-green-700 transition-colors">
-                    <Terminal className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-bold text-white">Developer Settings</span>
+          <div className="mt-6 pt-6 border-t border-white/10">
+            <button 
+              onClick={() => setShowDevLogin(true)}
+              className="w-full p-4 flex items-center justify-between bg-white/10 hover:bg-white/20 transition-colors group/dev rounded-2xl border border-white/10"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-white/20 text-white rounded-xl group-hover/dev:bg-white group-hover/dev:text-green-700 transition-colors">
+                  <Terminal className="w-5 h-5" />
                 </div>
-                <ShieldCheck className="w-4 h-4 text-white/40 group-hover/dev:text-white transition-colors" />
-              </button>
-            </div>
-          )}
+                <span className="text-sm font-bold text-white">Developer Settings</span>
+              </div>
+              <ShieldCheck className="w-4 h-4 text-white/40 group-hover/dev:text-white transition-colors" />
+            </button>
+          </div>
         </div>
       </div>
 

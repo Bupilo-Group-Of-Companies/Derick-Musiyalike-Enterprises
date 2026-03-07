@@ -40,6 +40,7 @@ export interface Admin {
   createdAt: string;
   status: 'active' | 'suspended';
   isMainAdmin?: boolean;
+  isStaffAdmin?: boolean; // New field
   approvedAppName?: string;
 }
 
@@ -47,11 +48,13 @@ export interface AppRequest {
   id: string;
   adminId: string;
   requestedName: string;
+  appIcon?: string; // New field for image upload
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   createdBy: string; // Admin name
   desiredUsername?: string;
   desiredPassword?: string;
+  downloadUrl?: string;
 }
 
 export interface Agent {
@@ -195,9 +198,30 @@ export interface AgentRequest {
   adminId?: string; // If they applied under a specific admin
 }
 
+export interface AIPublishRequest {
+  id: string;
+  requesterId: string;
+  requesterRole: Role;
+  content: string;
+  title: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  publishedAt?: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'completed';
+  createdAt: string;
+}
+
 export interface SystemConfig {
   appName: string;
   appLogo: string;
+  dmiLogo?: string;
   aiPrompt: string;
   primaryColor: string;
   maintenanceMode: boolean;

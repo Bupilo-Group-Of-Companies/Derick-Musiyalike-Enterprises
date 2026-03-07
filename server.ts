@@ -478,9 +478,11 @@ async function startServer() {
   // Chat Messages routes
   app.get('/api/chat-messages', (req, res) => {
     const db = readDb();
-    const { userId, adminId } = req.query;
+    const { userId, adminId, chatId } = req.query;
     let messages = db.chatMessages;
-    if (userId) {
+    if (chatId) {
+      messages = messages.filter((m: any) => m.senderId === chatId || m.receiverId === chatId || m.chatId === chatId);
+    } else if (userId) {
       messages = messages.filter((m: any) => m.senderId === userId || m.receiverId === userId);
     }
     if (adminId) {

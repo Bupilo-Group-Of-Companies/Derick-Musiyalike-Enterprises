@@ -18,6 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useZoom } from './contexts/ZoomContext';
 import Home from './components/Home';
 import LoanSection from './components/LoanSection';
 import DigitalServices from './components/DigitalServices';
@@ -36,6 +37,7 @@ import NotificationsPanel from './components/NotificationsPanel';
 import AgentLogin from './components/AgentLogin';
 import AIServicesSection from './components/AIServicesSection';
 import LockScreen from './components/LockScreen';
+import VerticalScale from './components/VerticalScale';
 import { Section, User, SystemConfig, AppNotification, Agent } from './types';
 
 const App: React.FC = () => {
@@ -52,6 +54,7 @@ const App: React.FC = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const { zoom } = useZoom();
   const [isLocked, setIsLocked] = useState(false);
 
   // Idle Logout
@@ -309,14 +312,22 @@ const App: React.FC = () => {
   };
 
   if (isAdminMode) {
-    return <AdminPanel onLogout={() => setIsAdminMode(false)} isDeveloper={isDeveloperMode} />;
+    return (
+      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+        <AdminPanel onLogout={() => setIsAdminMode(false)} isDeveloper={isDeveloperMode} />
+      </div>
+    );
   }
 
   if (isAgentMode) {
-    return <AgentPanel onLogout={() => {
-      setIsAgentMode(false);
-      setCurrentAgent(null);
-    }} agentId={currentAgent?.id || ''} />;
+    return (
+      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+        <AgentPanel onLogout={() => {
+          setIsAgentMode(false);
+          setCurrentAgent(null);
+        }} agentId={currentAgent?.id || ''} />
+      </div>
+    );
   }
 
   if (showSplash || !config) {
@@ -516,9 +527,11 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
+      <VerticalScale />
+
       {/* Main Content */}
-      <main className="max-w-md mx-auto pt-24 pb-32 px-6 min-h-screen flex flex-col">
-        <div className="flex-1">
+      <main className="max-w-md mx-auto pt-24 pb-32 px-6 min-h-screen flex flex-col overflow-y-auto">
+        <div className="flex-1" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}

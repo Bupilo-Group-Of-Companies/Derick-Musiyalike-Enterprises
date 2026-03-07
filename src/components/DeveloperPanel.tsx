@@ -37,21 +37,26 @@ import {
   Briefcase,
   Download,
   Copy,
-  ExternalLink
+  Share2,
+  Sparkles,
+  Upload,
+  Search
 } from 'lucide-react';
 import { User, AIServer, SystemConfig, Admin, AppRequest, Meeting, StreamingApp, Tool, Agent } from '../types';
 
 import SupportChat from './SupportChat';
+import AILab from './AILab';
 import LiveMeeting from './LiveMeeting';
-
-import TaskManager from './TaskManager';
+import ZoomControl from './ZoomControl';
 
 interface DeveloperPanelProps {
   onLogout: () => void;
 }
 
+import { sendPushNotification } from '../utils/notifications';
+
 const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout }) => {
-  const [activePanel, setActivePanel] = useState<'system' | 'users' | 'agents' | 'ai' | 'database' | 'logs' | 'toolbox' | 'invitations' | 'memory' | 'admins' | 'app-requests' | 'meetings' | 'tools' | 'streaming' | 'storage' | 'browser' | 'code-editor' | 'tasks'>('system');
+  const [activePanel, setActivePanel] = useState<'system' | 'users' | 'agents' | 'ai' | 'database' | 'logs' | 'toolbox' | 'invitations' | 'memory' | 'admins' | 'app-requests' | 'meetings' | 'tools' | 'streaming' | 'storage' | 'browser' | 'code-editor' | 'ai-publish'>('system');
   const [config, setConfig] = useState<SystemConfig>({
     appName: 'MoneyLink Financial',
     appLogo: logo,
@@ -67,42 +72,43 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [streamingApps, setStreamingApps] = useState<StreamingApp[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
-  const [files, setFiles] = useState<{ id: string, name: string, size: string, type: string, date: string, content?: string }[]>([]);
+  const [files, setFiles] = useState<{ id: string, name: string, size: string, type: string, date: string, content?: string, folderId?: string | null }[]>([]);
+  const [folders, setFolders] = useState<{ id: string, name: string, parentId: string | null }[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('moneylink_dev_recent_searches');
+    if (saved) {
+      setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  const handleSearch = (term: string) => {
+    setSearchQuery(term);
+    if (term.trim() && !recentSearches.includes(term.trim())) {
+      const updated = [term.trim(), ...recentSearches].slice(0, 5);
+      setRecentSearches(updated);
+      localStorage.setItem('moneylink_dev_recent_searches', JSON.stringify(updated));
+    }
+  };
+
+  const createFolder = (name: string) => {
+    const newFolder = { id: Math.random().toString(36).substr(2, 9), name, parentId: currentFolderId };
+    setFolders([...folders, newFolder]);
+  };
+
+  const deleteFolder = (id: string) => {
+    setFolders(folders.filter(f => f.id !== id));
+    setFiles(files.filter(f => f.folderId !== id));
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [editingDbKey, setEditingDbKey] = useState<{key: string, value: string} | null>(null);
   const [browserUrl, setBrowserUrl] = useState('https://derickmusiyalike.com');
   const [isRecording, setIsRecording] = useState(false);
   const [showLiveMeeting, setShowLiveMeeting] = useState(false);
   const [aiCommand, setAiCommand] = useState('');
-  const [newLinkName, setNewLinkName] = useState('');
-  const [newLinkUrl, setNewLinkUrl] = useState('');
-  const [newLinkCategory, setNewLinkCategory] = useState<'regulatory' | 'social' | 'other'>('other');
-
-  const addExternalLink = () => {
-    if (!newLinkName || !newLinkUrl) return;
-    const newLink = {
-      id: Date.now().toString(),
-      name: newLinkName,
-      url: newLinkUrl,
-      category: newLinkCategory
-    };
-    setConfig(prev => ({
-      ...prev,
-      externalLinks: [...(prev.externalLinks || []), newLink]
-    }));
-    setNewLinkName('');
-    setNewLinkUrl('');
-    addLog(`Added External Link: ${newLinkName}`, 'info');
-  };
-
-  const removeExternalLink = (id: string) => {
-    setConfig(prev => ({
-      ...prev,
-      externalLinks: (prev.externalLinks || []).filter(l => l.id !== id)
-    }));
-    addLog(`Removed External Link ID: ${id}`, 'warn');
-  };
-
   const [codeContent, setCodeContent] = useState(`// ${config.appName} - App Builder
 // Use this to develop and publish webs/apps for free
 
@@ -161,11 +167,7 @@ Development Team`);
       primaryColor: isPartner ? '#1e3a8a' : '#15803d',
       maintenanceMode: false,
       twoFactorEnabled: true,
-      biometricEnabled: true,
-      externalLinks: [
-        { id: 'boz', name: 'Bank of Zambia', url: 'https://www.boz.zm', category: 'regulatory' },
-        { id: 'fb', name: 'Facebook (Free Mode)', url: 'https://facebook.com', category: 'social' }
-      ]
+      biometricEnabled: true
     };
     
     if (isPartner) {
@@ -275,7 +277,8 @@ Development Team`);
         size: (file.size / 1024).toFixed(2) + ' KB',
         type: file.type,
         date: new Date().toLocaleDateString(),
-        content: event.target?.result as string
+        content: event.target?.result as string,
+        folderId: currentFolderId
       };
       const updatedFiles = [newFile, ...files];
       setFiles(updatedFiles);
@@ -427,7 +430,7 @@ Development Team`);
     });
     localStorage.setItem('moneylink_admin_notifications', JSON.stringify(notifications));
     addLog('Admin Notification Sent', 'info');
-    alert('Test Notification Sent to Company Management');
+    alert('Test Notification Sent to Admin Panel');
   };
 
   const wipeData = () => {
@@ -532,6 +535,7 @@ Development Team`);
     }
     
     setAppRequests(prev => prev.map(r => r.id === request.id ? { ...r, status: 'approved' } : r));
+    sendPushNotification('App Request Approved', { body: `App Request for "${request.requestedName}" approved!` });
     alert(`App Request for "${request.requestedName}" approved! Admin can now login with new credentials.`);
   };
 
@@ -784,6 +788,15 @@ Development Team`);
             APP_REQUESTS
           </button>
           <button
+            onClick={() => setActivePanel('ai-publish')}
+            className={`px-6 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activePanel === 'ai-publish' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            AI_LAB
+          </button>
+          <button
             onClick={() => setActivePanel('meetings')}
             className={`px-6 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               activePanel === 'meetings' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
@@ -800,15 +813,6 @@ Development Team`);
           >
             <Wrench className="w-4 h-4" />
             DEV_TOOLS
-          </button>
-          <button
-            onClick={() => setActivePanel('tasks')}
-            className={`px-6 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activePanel === 'tasks' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Check className="w-4 h-4" />
-            TASKS
           </button>
           <button
             onClick={() => setActivePanel('streaming')}
@@ -832,6 +836,40 @@ Development Team`);
               >
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
                   <h2 className="text-xl font-bold">Admin Management</h2>
+                  <button 
+                    onClick={async () => {
+                      const companyName = prompt('Enter Company Name:');
+                      if (!companyName) return;
+                      const username = prompt('Enter Username:');
+                      if (!username) return;
+                      const password = prompt('Enter Password:');
+                      if (!password) return;
+
+                      const newAdmin: Admin = {
+                        id: Date.now().toString(),
+                        username,
+                        password,
+                        companyName,
+                        isApproved: true,
+                        status: 'active',
+                        createdAt: new Date().toISOString(),
+                        isMainAdmin: confirm('Make this admin a Main Admin (App Role Admin)?'),
+                        isStaffAdmin: false
+                      };
+
+                      await fetch('/api/admins', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newAdmin)
+                      });
+
+                      setAdmins(prev => [...prev, newAdmin]);
+                      alert('Admin created successfully!');
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Create Admin
+                  </button>
                   <span className="text-[10px] font-bold bg-blue-600 px-2 py-1 rounded-md">{admins.length} TOTAL_ADMINS</span>
                 </div>
                 <div className="space-y-4">
@@ -843,6 +881,22 @@ Development Team`);
                         <p className="text-[10px] text-blue-400 font-bold mt-1">STATUS: {admin.status.toUpperCase()}</p>
                       </div>
                       <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            const updatedAdmin = { ...admin, isStaffAdmin: !admin.isStaffAdmin };
+                            fetch(`/api/admins/${admin.id}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(updatedAdmin)
+                            }).then(() => {
+                              setAdmins(prev => prev.map(a => a.id === admin.id ? updatedAdmin : a));
+                            });
+                          }}
+                          className={`p-2 rounded-lg transition-all ${admin.isStaffAdmin ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-white/40'}`}
+                          title="Toggle Staff Admin"
+                        >
+                          <Briefcase className="w-4 h-4" />
+                        </button>
                         <button onClick={() => updateAdminUsername(admin.id)} className="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-all" title="Change Username">
                           <Users className="w-4 h-4" />
                         </button>
@@ -856,6 +910,16 @@ Development Team`);
                     </div>
                   ))}
                 </div>
+              </motion.div>
+            )}
+
+            {activePanel === 'ai-publish' && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-white rounded-[2.5rem] overflow-hidden"
+              >
+                <AILab currentUser={{ id: 'developer' }} role="developer" />
               </motion.div>
             )}
 
@@ -879,7 +943,7 @@ Development Team`);
                           STATUS: {req.status.toUpperCase()}
                         </p>
                       </div>
-                      {req.status === 'pending' && (
+                      {req.status === 'pending' ? (
                         <div className="flex gap-2">
                           <button onClick={() => approveRequest(req)} className="p-2 bg-green-600/20 hover:bg-green-600/40 rounded-lg text-green-400 transition-all">
                             <Check className="w-4 h-4" />
@@ -888,7 +952,72 @@ Development Team`);
                             <X className="w-4 h-4" />
                           </button>
                         </div>
-                      )}
+                      ) : req.status === 'approved' ? (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={async () => {
+                              const newName = prompt('Edit App Name:', req.requestedName);
+                              if (newName) {
+                                const updatedReq = { ...req, requestedName: newName };
+                                await fetch(`/api/app-requests/${req.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(updatedReq)
+                                });
+                                setAppRequests(prev => prev.map(r => r.id === req.id ? updatedReq : r));
+                              }
+                            }}
+                            className="p-2 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-all" title="Edit App Details"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                          <label className="p-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-lg text-purple-400 transition-all cursor-pointer" title="Upload APK">
+                            <Upload className="w-4 h-4" />
+                            <input 
+                              type="file" 
+                              accept=".apk" 
+                              className="hidden" 
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  // Mock upload process
+                                  alert(`Uploading ${file.name}...`);
+                                  const mockUrl = `https://example.com/downloads/${req.id}/${file.name}`;
+                                  const updatedReq = { ...req, downloadUrl: mockUrl };
+                                  await fetch(`/api/app-requests/${req.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(updatedReq)
+                                  });
+                                  setAppRequests(prev => prev.map(r => r.id === req.id ? updatedReq : r));
+                                  alert('Upload complete! Download link generated.');
+                                }
+                              }}
+                            />
+                          </label>
+                          {req.downloadUrl && (
+                            <>
+                              <a 
+                                href={req.downloadUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-2 bg-green-600/20 hover:bg-green-600/40 rounded-lg text-green-400 transition-all" title="Download APK"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`Download ${req.requestedName} App: ${req.downloadUrl}`);
+                                  alert('App download link copied to clipboard!');
+                                }}
+                                className="p-2 bg-amber-600/20 hover:bg-amber-600/40 rounded-lg text-amber-400 transition-all" title="Share App Link"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -945,15 +1074,54 @@ Development Team`);
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6"
               >
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4 relative">
                   <h2 className="text-xl font-bold">Developer Tools</h2>
-                  <input 
-                    type="text" 
-                    placeholder="Search tools..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Search tools..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setShowRecentSearches(true)}
+                      onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSearch(searchQuery);
+                          setShowRecentSearches(false);
+                        }
+                      }}
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500 w-64"
+                    />
+                    {showRecentSearches && recentSearches.length > 0 && (
+                      <div className="absolute top-full right-0 mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg z-50 overflow-hidden">
+                        <div className="px-4 py-2 bg-white/5 border-b border-white/10 text-[10px] font-bold text-white/40 flex justify-between items-center">
+                          RECENT SEARCHES
+                          <button 
+                            onClick={() => {
+                              setRecentSearches([]);
+                              localStorage.removeItem('moneylink_dev_recent_searches');
+                            }}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        {recentSearches.map((term, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setSearchQuery(term);
+                              setShowRecentSearches(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center gap-2 text-white/80"
+                          >
+                            <Search className="w-3 h-3 text-white/40" />
+                            {term}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
                   {tools.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase())).map((tool) => (
@@ -1134,15 +1302,34 @@ Development Team`);
                 </div>
 
                 <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Application Logo URL</label>
-                  <div className="flex gap-4">
+                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Application Logo (URL or Upload)</label>
+                  <div className="flex gap-4 items-center">
                     <input 
                       type="text"
                       value={config.appLogo}
                       onChange={(e) => setConfig({ ...config, appLogo: e.target.value })}
+                      placeholder="Paste image URL here"
                       className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
                     />
-                    <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/20">
+                    <label className="cursor-pointer bg-white/10 hover:bg-white/20 px-4 py-3 rounded-xl text-sm font-bold border border-white/20 transition-colors">
+                      Upload
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setConfig({ ...config, appLogo: reader.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }} 
+                      />
+                    </label>
+                    <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
                       <img 
                         src={config.appLogo} 
                         alt="Preview" 
@@ -1151,6 +1338,51 @@ Development Team`);
                           (e.target as HTMLImageElement).src = "https://placehold.co/200x200/15803d/ffffff?text=LM";
                         }}
                       />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">DMI Group Logo (URL or Upload)</label>
+                  <div className="flex gap-4 items-center">
+                    <input 
+                      type="text"
+                      value={config.dmiLogo || ''}
+                      onChange={(e) => setConfig({ ...config, dmiLogo: e.target.value })}
+                      placeholder="Paste image URL here"
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                    />
+                    <label className="cursor-pointer bg-white/10 hover:bg-white/20 px-4 py-3 rounded-xl text-sm font-bold border border-white/20 transition-colors">
+                      Upload
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setConfig({ ...config, dmiLogo: reader.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }} 
+                      />
+                    </label>
+                    <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
+                      {config.dmiLogo ? (
+                        <img 
+                          src={config.dmiLogo} 
+                          alt="DMI Preview" 
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://placehold.co/200x200/1e3a8a/ffffff?text=DMI";
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-white/40">None</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1232,80 +1464,6 @@ Development Team`);
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-8 border-t border-white/10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5 text-green-400" />
-                      <h2 className="text-xl font-bold">External Resources</h2>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(config.externalLinks || []).map((link) => (
-                      <div 
-                        key={link.id}
-                        className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4 hover:bg-white/10 transition-all group relative"
-                      >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                          link.category === 'regulatory' ? 'bg-green-900/30 text-green-400' : 
-                          link.category === 'social' ? 'bg-blue-900/30 text-blue-400' : 'bg-white/10 text-white'
-                        }`}>
-                          {link.category === 'regulatory' ? <Shield className="w-5 h-5" /> : <Globe className="w-5 h-5" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-bold text-sm">{link.name}</p>
-                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-white/40 hover:text-blue-400 truncate block max-w-[150px]">{link.url}</a>
-                        </div>
-                        <button 
-                          onClick={() => removeExternalLink(link.id)}
-                          className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-all opacity-0 group-hover:opacity-100 absolute right-2 top-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Add New Link Form */}
-                  <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-4">
-                    <h3 className="text-sm font-bold text-white/60">Add New Resource</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input 
-                        type="text" 
-                        placeholder="Name (e.g. Google)" 
-                        value={newLinkName}
-                        onChange={(e) => setNewLinkName(e.target.value)}
-                        className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500 text-white"
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="URL (https://...)" 
-                        value={newLinkUrl}
-                        onChange={(e) => setNewLinkUrl(e.target.value)}
-                        className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500 text-white"
-                      />
-                      <div className="flex gap-2">
-                        <select 
-                          value={newLinkCategory}
-                          onChange={(e) => setNewLinkCategory(e.target.value as any)}
-                          className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500 flex-1 text-white"
-                        >
-                          <option value="other">Other</option>
-                          <option value="regulatory">Regulatory</option>
-                          <option value="social">Social</option>
-                        </select>
-                        <button 
-                          onClick={addExternalLink}
-                          disabled={!newLinkName || !newLinkUrl}
-                          className="px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 <button 
                   onClick={saveConfig}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all"
@@ -1324,7 +1482,51 @@ Development Team`);
               >
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
                   <h2 className="text-xl font-bold">User Override Panel</h2>
-                  <span className="text-[10px] font-bold bg-blue-600 px-2 py-1 rounded-md">{users.length} TOTAL_RECORDS</span>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={async () => {
+                        const name = prompt('Enter Full Name:');
+                        if (!name) return;
+                        const phone = prompt('Enter Phone Number:');
+                        if (!phone) return;
+                        const nrc = prompt('Enter NRC:');
+                        if (!nrc) return;
+                        const password = prompt('Enter Password:');
+                        if (!password) return;
+                        const balance = prompt('Enter Initial Balance:', '0');
+                        
+                        const newUser: User = {
+                          id: Date.now().toString(),
+                          name,
+                          phone,
+                          nrc,
+                          password,
+                          balance: parseFloat(balance || '0'),
+                          adminId: 'developer',
+                          isRegistered: true,
+                          isVerified: true,
+                          nrcFront: '',
+                          nrcBack: '',
+                          passportPhoto: '',
+                          selfiePhoto: ''
+                        };
+
+                        await fetch('/api/users', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(newUser)
+                        });
+                        
+                        setUsers(prev => [...prev, newUser]);
+                        addLog(`User Created: ${newUser.name}`, 'info');
+                        alert('User created successfully!');
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" /> Create User
+                    </button>
+                    <span className="text-[10px] font-bold bg-blue-600 px-2 py-1 rounded-md">{users.length} TOTAL_RECORDS</span>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -1369,7 +1571,39 @@ Development Team`);
               >
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
                   <h2 className="text-xl font-bold">Agent Management</h2>
-                  <span className="text-[10px] font-bold bg-purple-600 px-2 py-1 rounded-md">{agents.length} AGENTS</span>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={async () => {
+                        const name = prompt('Enter Agent Name:');
+                        if (!name) return;
+                        const phone = prompt('Enter Agent Phone:');
+                        if (!phone) return;
+                        
+                        const newAgent: Agent = {
+                          id: Date.now().toString(),
+                          adminId: 'developer',
+                          name,
+                          phone,
+                          status: 'active',
+                          joinedAt: new Date().toISOString()
+                        };
+                        
+                        await fetch('/api/agents', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(newAgent)
+                        });
+                        
+                        setAgents([...agents, newAgent]);
+                        addLog(`Agent Created: ${newAgent.name}`, 'info');
+                        alert('Agent created successfully!');
+                      }}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" /> Create Agent
+                    </button>
+                    <span className="text-[10px] font-bold bg-purple-600 px-2 py-1 rounded-md">{agents.length} AGENTS</span>
+                  </div>
                 </div>
 
                 {/* Agent Requests */}
@@ -1444,10 +1678,32 @@ Development Team`);
                         <p className="text-[8px] text-blue-400 font-bold mt-1">ADMIN_ID: {agent.adminId}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button className="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-all">
+                        <button 
+                          onClick={async () => {
+                            const newPhone = prompt('Edit Agent Phone:', agent.phone);
+                            if (newPhone) {
+                              const updatedAgent = { ...agent, phone: newPhone };
+                              await fetch(`/api/agents/${agent.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(updatedAgent)
+                              });
+                              setAgents(prev => prev.map(a => a.id === agent.id ? updatedAgent : a));
+                            }
+                          }}
+                          className="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-all"
+                        >
                           <Settings className="w-4 h-4" />
                         </button>
-                        <button className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-all">
+                        <button 
+                          onClick={async () => {
+                            if (confirm('Permanently delete this agent?')) {
+                              await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
+                              setAgents(prev => prev.filter(a => a.id !== agent.id));
+                            }
+                          }}
+                          className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-all"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1848,15 +2104,36 @@ Development Team`);
                 className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6"
               >
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Dev Cloud Storage</h2>
-                  <label className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-[10px] cursor-pointer hover:bg-blue-700 transition-all flex items-center gap-2">
-                    <Plus className="w-3 h-3" />
-                    UPLOAD_ASSET
-                    <input type="file" className="hidden" onChange={handleFileUpload} />
-                  </label>
+                  <h2 className="text-xl font-bold">Dev Cloud Storage {currentFolderId && `> ${folders.find(f => f.id === currentFolderId)?.name}`}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                        const name = prompt('Folder name:');
+                        if (name) createFolder(name);
+                      }} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl font-bold text-[10px] hover:bg-white/10 transition-all flex items-center gap-2">
+                      <Plus className="w-3 h-3" /> NEW_FOLDER
+                    </button>
+                    <label className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-[10px] cursor-pointer hover:bg-blue-700 transition-all flex items-center gap-2">
+                      <Plus className="w-3 h-3" />
+                      UPLOAD_ASSET
+                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
-                  {files.map(file => (
+                  {folders.filter(f => f.parentId === currentFolderId).map(folder => (
+                    <div key={folder.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-blue-500 transition-all" onClick={() => setCurrentFolderId(folder.id)}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center">
+                          <Database className="w-4 h-4" />
+                        </div>
+                        <p className="text-xs font-bold">{folder.name}</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {files.filter(f => f.folderId === currentFolderId).map(file => (
                     <div key={file.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center">
@@ -1884,6 +2161,9 @@ Development Team`);
                       </div>
                     </div>
                   ))}
+                  {files.filter(f => f.folderId === currentFolderId).length === 0 && folders.filter(f => f.parentId === currentFolderId).length === 0 && (
+                    <div className="col-span-full py-10 text-center text-[10px] text-white/40">No files or folders in this location</div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -1913,23 +2193,8 @@ Development Team`);
             )}
           </div>
 
-          {activePanel === 'tasks' && (
-            <div className="h-[600px] bg-white rounded-[2.5rem] overflow-hidden">
-              <TaskManager role="developer" currentUser="developer" />
-            </div>
-          )}
-
           {/* Sidebar Info */}
           <div className="space-y-8">
-            {/* Contact Info (Restricted) */}
-            <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 text-center">
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Internal Contact</p>
-              <div className="flex flex-col gap-2">
-                <a href="mailto:derickmusiyalikeinstitution@gmail.com" className="text-[10px] font-bold text-blue-400 hover:underline">derickmusiyalikeinstitution@gmail.com</a>
-                <a href="https://wa.me/260774218141" className="text-[10px] font-bold text-blue-400 hover:underline">WhatsApp (+260 774218141)</a>
-              </div>
-            </div>
-
             <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-6">
               <h3 className="text-sm font-bold flex items-center gap-2 text-blue-400">
                 <Shield className="w-4 h-4" />
@@ -1993,7 +2258,7 @@ Development Team`);
                 <button 
                   onClick={() => {
                     localStorage.setItem('moneylink_admin_direct_login', 'true');
-                    alert('Direct Login enabled. Go to Company Management to access without credentials.');
+                    alert('Direct Login enabled. Go to Admin Panel to access without credentials.');
                   }}
                   className="w-full py-3 bg-green-600/10 border border-green-600/30 rounded-xl text-[10px] font-bold text-green-400 hover:bg-green-600/20 transition-all"
                 >
@@ -2019,6 +2284,7 @@ Development Team`);
         </div>
       </div>
       <SupportChat currentUser={null} role="developer" config={config} />
+      <ZoomControl />
     </div>
   );
 };

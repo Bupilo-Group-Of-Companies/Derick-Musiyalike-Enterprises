@@ -15,7 +15,8 @@ import {
   Camera,
   Wand2,
   Maximize2,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from 'lucide-react';
 import { 
   generateThinkingResponse, 
@@ -38,7 +39,7 @@ interface AIServicesSectionProps {
 }
 
 const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, role }) => {
-  const [activeTab, setActiveTab] = useState<'thinking' | 'voice' | 'media' | 'creator' | 'maps'>('thinking');
+  const [activeTab, setActiveTab] = useState<'thinking' | 'voice' | 'media' | 'creator' | 'maps' | 'requests'>('thinking');
   const [isLoading, setIsLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState<any>(null);
@@ -55,14 +56,22 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
     { id: 'voice', label: 'Voice', icon: Mic, roles: ['admin', 'developer'] },
     { id: 'media', label: 'Media', icon: Video, roles: ['admin', 'developer'] },
     { id: 'creator', label: 'Creator', icon: Sparkles, roles: ['developer'] },
-    { id: 'maps', label: 'Maps', icon: MapPin, roles: ['developer'] },
+    { id: 'maps', label: 'Maps', icon: MapPin, roles: ['user', 'admin', 'developer'] },
+    { id: 'requests', label: 'Publish Requests', icon: Wand2, roles: ['user', 'admin', 'agent', 'developer'] },
   ].filter(tab => tab.roles.includes(role));
 
+  const [requests, setRequests] = useState<any[]>([]);
+
   useEffect(() => {
-    if (!availableTabs.find(t => t.id === activeTab)) {
-      setActiveTab(availableTabs[0]?.id as any || 'thinking');
+    if (activeTab === 'requests') {
+      const stored = JSON.parse(localStorage.getItem('moneylink_ai_publish_requests') || '[]');
+      if (role === 'developer') {
+        setRequests(stored);
+      } else {
+        setRequests(stored.filter((r: any) => r.requesterRole === role));
+      }
     }
-  }, [role]);
+  }, [activeTab, role]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,12 +88,34 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
   };
 
   const handlePublish = async () => {
-    if (role !== 'developer') return;
+    if (!response) return;
     setIsLoading(true);
     try {
-      // Simulate publishing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      alert("AI Model Published Successfully to Production!");
+      if (role === 'developer') {
+        // Simulate publishing directly
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const published = JSON.parse(localStorage.getItem('moneylink_published_ai_content') || '[]');
+        localStorage.setItem('moneylink_published_ai_content', JSON.stringify([{
+          id: Date.now().toString(),
+          content: response,
+          publishedAt: new Date().toISOString()
+        }, ...published]));
+        alert("Content Published Successfully to Production!");
+      } else {
+        // Submit request
+        const newRequest = {
+          id: Date.now().toString(),
+          requesterId: 'user', // Or get from context
+          requesterRole: role,
+          content: response,
+          title: prompt.substring(0, 50) || 'AI Generated Content',
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+        const stored = JSON.parse(localStorage.getItem('moneylink_ai_publish_requests') || '[]');
+        localStorage.setItem('moneylink_ai_publish_requests', JSON.stringify([newRequest, ...stored]));
+        alert("Publish request submitted to Developer for approval.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -149,13 +180,15 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
           }
           break;
         case 'maps':
-          if (role !== 'developer') return;
           let lat, lng;
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((pos) => {
-              lat = pos.coords.latitude;
-              lng = pos.coords.longitude;
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
             });
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+          } catch (e) {
+            console.warn("Geolocation failed, proceeding without location:", e);
           }
           result = await getMapsGroundingResponse(prompt, lat, lng);
           setResponse(result);
@@ -189,15 +222,14 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {role === 'developer' && (
-              <button 
-                onClick={handlePublish}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
-              >
-                <Wand2 className="w-4 h-4" />
-                Publish Model
-              </button>
-            )}
+            <button 
+              onClick={handlePublish}
+              disabled={!response || isLoading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
+            >
+              <Wand2 className="w-4 h-4" />
+              {role === 'developer' ? 'Publish Content' : 'Request Publish'}
+            </button>
             <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
               <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">System Online</span>
@@ -230,6 +262,44 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
 
         {/* Main Content Area */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {activeTab === 'requests' ? (
+            <div className="col-span-1 md:col-span-2 space-y-6">
+              <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 min-h-[400px]">
+                <h2 className="text-xl font-bold tracking-tighter uppercase italic mb-6">Publish Requests</h2>
+                <div className="space-y-4">
+                  {requests.length === 0 ? (
+                    <div className="text-center py-12 text-white/40">
+                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                      <p>No publish requests found.</p>
+                    </div>
+                  ) : (
+                    requests.map(request => (
+                      <div key={request.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-sm text-white">{request.title}</h3>
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                            request.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                            request.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {request.status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-white/60 bg-black/40 p-4 rounded-xl border border-white/5 whitespace-pre-wrap">
+                          {request.content}
+                        </div>
+                        <div className="text-[10px] text-white/40 flex gap-4 uppercase tracking-widest">
+                          <span>Role: {request.requesterRole}</span>
+                          <span>Date: {new Date(request.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
           {/* Input Section */}
           <div className="space-y-6">
             <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6">
@@ -428,6 +498,8 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer Info */}

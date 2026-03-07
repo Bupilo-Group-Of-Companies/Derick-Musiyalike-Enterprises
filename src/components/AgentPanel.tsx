@@ -17,11 +17,10 @@ import {
   Save,
   Video
 } from 'lucide-react';
-import { User, ChatMessage, Agent, SystemConfig } from '../types';
+import { User, ChatMessage, Agent, SystemConfig, Task } from '../types';
 import SupportChat from './SupportChat';
 import LiveMeeting from './LiveMeeting';
-
-import TaskManager from './TaskManager';
+import ZoomControl from './ZoomControl';
 
 interface AgentPanelProps {
   onLogout: () => void;
@@ -31,11 +30,33 @@ interface AgentPanelProps {
 
 const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper }) => {
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'tasks' | 'meeting'>('users');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'tasks' | 'meeting' | 'storage'>('users');
   const [searchTerm, setSearchTerm] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('moneylink_agent_recent_searches');
+    if (saved) {
+      setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (term.trim() && !recentSearches.includes(term.trim())) {
+      const updated = [term.trim(), ...recentSearches].slice(0, 5);
+      setRecentSearches(updated);
+      localStorage.setItem('moneylink_agent_recent_searches', JSON.stringify(updated));
+    }
+  };
   const [selectedUserForChat, setSelectedUserForChat] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const [files, setFiles] = useState<{ id: string, name: string, size: string, type: string, date: string, content?: string, folderId?: string | null }[]>([]);
+  const [folders, setFolders] = useState<{ id: string, name: string, parentId: string | null }[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [config, setConfig] = useState<SystemConfig>({
     appName: 'MoneyLink Financial',
     appLogo: '',
@@ -98,10 +119,66 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
           setConfig(prev => ({ ...prev, ...storedConfig }));
         }
       }
+      
+      const storedFiles = JSON.parse(localStorage.getItem('moneylink_agent_files') || '[]');
+      setFiles(storedFiles);
+      const storedFolders = JSON.parse(localStorage.getItem('moneylink_agent_folders') || '[]');
+      setFolders(storedFolders);
     };
     
     fetchData();
   }, [agentId]);
+
+  const createFolder = (name: string) => {
+    const newFolder = { id: Math.random().toString(36).substr(2, 9), name, parentId: currentFolderId };
+    const updatedFolders = [...folders, newFolder];
+    setFolders(updatedFolders);
+    localStorage.setItem('moneylink_agent_folders', JSON.stringify(updatedFolders));
+  };
+
+  const deleteFolder = (id: string) => {
+    const updatedFolders = folders.filter(f => f.id !== id);
+    setFolders(updatedFolders);
+    localStorage.setItem('moneylink_agent_folders', JSON.stringify(updatedFolders));
+    const updatedFiles = files.filter(f => f.folderId !== id);
+    setFiles(updatedFiles);
+    localStorage.setItem('moneylink_agent_files', JSON.stringify(updatedFiles));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const newFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: (file.size / 1024).toFixed(2) + ' KB',
+        type: file.type,
+        date: new Date().toLocaleDateString(),
+        content: event.target?.result as string,
+        folderId: currentFolderId
+      };
+      const updatedFiles = [newFile, ...files];
+      setFiles(updatedFiles);
+      localStorage.setItem('moneylink_agent_files', JSON.stringify(updatedFiles));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const deleteFile = (id: string) => {
+    const updatedFiles = files.filter(f => f.id !== id);
+    setFiles(updatedFiles);
+    localStorage.setItem('moneylink_agent_files', JSON.stringify(updatedFiles));
+  };
+
+  const downloadFile = (file: any) => {
+    const a = document.createElement('a');
+    a.href = file.content;
+    a.download = file.name;
+    a.click();
+  };
 
   const handleUpdateUser = async (updatedUser: User) => {
     try {
@@ -205,6 +282,15 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
             <Video className="w-4 h-4" />
             MEETING
           </button>
+          <button
+            onClick={() => setActiveTab('storage')}
+            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'storage' ? 'bg-white shadow-sm text-purple-600' : 'text-[#666]'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            STORAGE
+          </button>
         </div>
 
         {/* Main Content */}
@@ -220,8 +306,45 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
                     placeholder="Search users..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onFocus={() => setShowRecentSearches(true)}
+                    onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSearch(searchTerm);
+                        setShowRecentSearches(false);
+                      }
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-[#F8F9FA] border border-[#E5E5E5] rounded-xl text-xs outline-none focus:border-purple-600"
                   />
+                  {showRecentSearches && recentSearches.length > 0 && (
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white border border-[#E5E5E5] rounded-xl shadow-lg z-50 overflow-hidden">
+                      <div className="px-4 py-2 bg-[#F8F9FA] border-b border-[#E5E5E5] text-[10px] font-bold text-[#999] flex justify-between items-center">
+                        RECENT SEARCHES
+                        <button 
+                          onClick={() => {
+                            setRecentSearches([]);
+                            localStorage.removeItem('moneylink_agent_recent_searches');
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      {recentSearches.map((term, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setSearchTerm(term);
+                            setShowRecentSearches(false);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-[#F8F9FA] transition-colors flex items-center gap-2"
+                        >
+                          <Search className="w-3 h-3 text-[#999]" />
+                          {term}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -328,6 +451,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
 
                     <div className="p-4 bg-white border-t border-[#F0F0F0] flex gap-2">
                       <input 
+                        id="agent-chat-input"
                         type="text"
                         placeholder="Type a message..."
                         className="flex-1 bg-[#F8F9FA] border border-[#E5E5E5] rounded-xl px-4 py-3 text-xs outline-none focus:border-purple-600"
@@ -361,7 +485,39 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
                           }
                         }}
                       />
-                      <button className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all">
+                      <button 
+                        onClick={() => {
+                          const input = document.getElementById('agent-chat-input') as HTMLInputElement;
+                          if (input) {
+                            const event = new KeyboardEvent('keydown', { key: 'Enter' });
+                            input.dispatchEvent(event);
+                            // Or just duplicate the logic
+                            const text = input.value.trim();
+                            if (!text) return;
+                            
+                            const chatId = selectedUserForChat.id;
+                            const existingMessages = JSON.parse(localStorage.getItem(`moneylink_chats_${chatId}`) || '[]');
+                            const newMessage: ChatMessage = {
+                              id: Math.random().toString(36).substr(2, 9),
+                              senderId: agentId,
+                              receiverId: chatId,
+                              text: text,
+                              timestamp: new Date().toISOString(),
+                              isAdmin: true
+                            };
+                            
+                            const updatedMessages = [...existingMessages, newMessage];
+                            localStorage.setItem(`moneylink_chats_${chatId}`, JSON.stringify(updatedMessages));
+                            
+                            const storageEvent = new Event('storage');
+                            window.dispatchEvent(storageEvent);
+                            
+                            input.value = '';
+                            setSelectedUserForChat({...selectedUserForChat}); 
+                          }
+                        }}
+                        className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"
+                      >
                         <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
@@ -381,8 +537,53 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
           )}
 
           {activeTab === 'tasks' && (
-            <div className="h-[600px] p-4">
-              <TaskManager role="agent" currentUser={agentId} />
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold">Tasks</h3>
+                <button 
+                  onClick={() => {
+                    const title = prompt('Task title:');
+                    if (title) {
+                      const priority = prompt('Priority (low, medium, high):') as 'low' | 'medium' | 'high' || 'medium';
+                      const newTask: Task = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        title,
+                        description: '',
+                        priority,
+                        status: 'pending',
+                        createdAt: new Date().toISOString()
+                      };
+                      setTasks([...tasks, newTask]);
+                    }
+                  }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Add Task
+                </button>
+              </div>
+              <div className="space-y-4">
+                {tasks.length === 0 ? (
+                  <div className="text-center text-[#999] py-12">No tasks yet.</div>
+                ) : (
+                  tasks.map(task => (
+                    <div key={task.id} className="bg-white p-4 rounded-2xl border border-[#F0F0F0] flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold">{task.title}</h4>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                          task.priority === 'high' ? 'bg-red-100 text-red-600' :
+                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
+                          'bg-green-100 text-green-600'
+                        }`}>
+                          {task.priority}
+                        </span>
+                      </div>
+                      <button onClick={() => setTasks(tasks.filter(t => t.id !== task.id))} className="text-red-500">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -393,6 +594,76 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
                 userName={currentAgent?.name || 'Agent'}
                 onLeave={() => setActiveTab('users')}
               />
+            </div>
+          )}
+
+          {activeTab === 'storage' && (
+            <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#E5E5E5]">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-black">Agent Storage {currentFolderId && `> ${folders.find(f => f.id === currentFolderId)?.name}`}</h2>
+                <div className="flex gap-2">
+                  {currentFolderId && (
+                    <button 
+                      onClick={() => setCurrentFolderId(folders.find(f => f.id === currentFolderId)?.parentId || null)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-200 transition-all flex items-center gap-2"
+                    >
+                      BACK
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      const name = prompt('Folder name:');
+                      if (name) createFolder(name);
+                    }}
+                    className="px-4 py-2 bg-purple-50 text-purple-600 rounded-xl font-bold text-xs hover:bg-purple-100 transition-all flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> NEW_FOLDER
+                  </button>
+                  <label className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-purple-700 transition-all flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> UPLOAD_FILE
+                    <input type="file" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {folders.filter(f => f.parentId === currentFolderId).map(folder => (
+                  <div key={folder.id} className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm group relative flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 transition-all" onClick={() => setCurrentFolderId(folder.id)}>
+                    <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <FileText className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <p className="font-bold text-sm truncate">{folder.name}</p>
+                    <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="absolute top-2 right-2 p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                
+                {files.filter(f => f.folderId === currentFolderId).map(file => (
+                  <div key={file.id} className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm group relative flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <FileText className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <p className="font-bold text-sm truncate w-full text-center">{file.name}</p>
+                    <p className="text-xs text-[#666] mt-1">{file.size} • {file.date}</p>
+                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => downloadFile(file)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white">
+                        <Save className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteFile(file.id)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {files.filter(f => f.folderId === currentFolderId).length === 0 && folders.filter(f => f.parentId === currentFolderId).length === 0 && (
+                  <div className="col-span-1 sm:col-span-2 md:col-span-3 py-12 text-center border-2 border-dashed border-[#E5E5E5] rounded-[2rem]">
+                    <FileText className="w-12 h-12 text-[#CCC] mx-auto mb-4" />
+                    <p className="text-sm font-bold text-[#999]">No files or folders in this location</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -467,15 +738,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
         </AnimatePresence>
 
         <SupportChat currentUser={null} role="agent" config={config} />
-        
-        {/* Contact Info (Restricted) */}
-        <div className="text-center space-y-2 pb-8 opacity-50 hover:opacity-100 transition-opacity">
-          <p className="text-[10px] font-bold text-[#999] uppercase tracking-widest">Internal Contact</p>
-          <div className="flex justify-center gap-4">
-            <a href="mailto:derickmusiyalikeinstitution@gmail.com" className="text-[10px] font-bold text-purple-600 hover:underline">derickmusiyalikeinstitution@gmail.com</a>
-            <a href="https://wa.me/260774218141" className="text-[10px] font-bold text-purple-600 hover:underline">WhatsApp (+260 774218141)</a>
-          </div>
-        </div>
+        <ZoomControl />
       </div>
     </div>
   );

@@ -22,8 +22,6 @@ interface TrustSectionProps {
 }
 
 const TrustSection: React.FC<TrustSectionProps> = ({ onBack, config }) => {
-  const [browserUrl, setBrowserUrl] = useState<string | null>(null);
-
   const trustItems = [
     { id: 'about', label: `About ${config.appName}`, icon: Info, desc: 'Our mission and vision', url: 'https://moneylink.com/about' },
     { id: 'terms', label: 'Terms & Conditions', icon: FileText, desc: 'Legal agreements', url: 'https://moneylink.com/terms' },
@@ -33,7 +31,7 @@ const TrustSection: React.FC<TrustSectionProps> = ({ onBack, config }) => {
   ];
 
   const openBrowser = (url: string) => {
-    setBrowserUrl(url);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -132,52 +130,9 @@ const TrustSection: React.FC<TrustSectionProps> = ({ onBack, config }) => {
         </div>
         <div className="pt-2 flex justify-center gap-4">
           <a href="mailto:derickmusiyalikeinstitution@gmail.com" className="text-[10px] font-bold text-green-700 hover:underline">EMAIL</a>
-          <a href="https://wa.me/260774218141" className="text-[10px] font-bold text-green-700 hover:underline">WHATSAPP</a>
+          <a href="https://wa.me/260774218141" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-green-700 hover:underline">WHATSAPP</a>
         </div>
       </div>
-
-      {/* Internal Browser Modal */}
-      <AnimatePresence>
-        {browserUrl && (
-          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col">
-            <div className="bg-white p-4 flex items-center justify-between border-b border-[#E5E5E5]">
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setBrowserUrl(null)}
-                  className="p-2 hover:bg-[#F0F0F0] rounded-full"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold truncate max-w-[200px]">{browserUrl}</span>
-                  <span className="text-[8px] text-green-700 font-bold flex items-center gap-1">
-                    <Shield className="w-2 h-2" /> Secure {config.appName} Browser
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-[#F0F0F0] rounded-full">
-                  <RefreshCw className="w-4 h-4 text-[#666]" />
-                </button>
-                <button 
-                  onClick={() => window.open(browserUrl, '_blank')}
-                  className="p-2 hover:bg-[#F0F0F0] rounded-full"
-                >
-                  <ExternalLink className="w-4 h-4 text-[#666]" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 bg-white relative">
-              <iframe 
-                src={browserUrl} 
-                className="w-full h-full border-none"
-                title="Internal Browser"
-              />
-              <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/5 to-transparent h-4"></div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

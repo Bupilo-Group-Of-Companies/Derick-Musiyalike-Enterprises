@@ -81,6 +81,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
   }, [password]);
 
   const [otpError, setOtpError] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
 
   const handlePhoneSubmit = async () => {
     if (phoneNumber.length >= 9) {
@@ -97,12 +98,22 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
         }
       } catch (e) {
         console.error('Error checking existing user:', e);
+        const storedUsers: UserType[] = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
+        const existingUser = storedUsers.find(u => u.phone === phoneNumber || u.nrc === nrcNumber);
+        if (existingUser) {
+          alert('Your information has registered in our system, please login.');
+          onCancel();
+          return;
+        }
       }
 
       setStep('otp');
-      // Mock sending OTP
-      console.log('OTP Sent to +260' + phoneNumber + ': 123456');
-      alert('Test OTP: 123456');
+      // Generate 6-digit secure OTP
+      const array = new Uint32Array(1);
+      window.crypto.getRandomValues(array);
+      const newOtp = (array[0] % 900000 + 100000).toString();
+      setGeneratedOtp(newOtp);
+      console.log('OTP Sent to +260' + phoneNumber + ': ' + newOtp);
     }
   };
 
@@ -122,7 +133,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
 
   const handleOtpSubmit = () => {
     const enteredOtp = otp.join('');
-    if (enteredOtp === '123456') {
+    if (enteredOtp === generatedOtp) {
       setStep('password');
       setOtpError('');
     } else {
@@ -395,6 +406,11 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
                   <p className="text-[#666] text-sm mt-2 leading-relaxed">
                     Enter the 6-digit code sent to <span className="font-bold text-[#1A1A1A]">+260 {phoneNumber}</span>
                   </p>
+                  {generatedOtp && (
+                    <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
+                      Test OTP: {generatedOtp}
+                    </div>
+                  )}
                 </div>
                 {otpError && (
                   <div className="p-3 bg-red-50 text-red-600 rounded-xl text-[10px] font-bold border border-red-100">

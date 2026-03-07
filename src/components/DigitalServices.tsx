@@ -47,6 +47,7 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [securityType, setSecurityType] = useState<'2fa' | 'biometric'>('biometric');
   const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>([]);
   const [showCryptoWallet, setShowCryptoWallet] = useState(false);
@@ -73,7 +74,12 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
 
   const openBrowser = (url: string) => {
     if (config.biometricEnabled || config.twoFactorEnabled) {
-      setSecurityType(config.biometricEnabled ? 'biometric' : '2fa');
+      const type = config.biometricEnabled ? 'biometric' : '2fa';
+      setSecurityType(type);
+      if (type === '2fa') {
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(newOtp);
+      }
       setPendingAction(() => () => setBrowserUrl(url));
       setShowSecurityModal(true);
     } else {
@@ -82,6 +88,11 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
   };
 
   const handleSecurityVerify = async () => {
+    if (securityType === '2fa' && otp !== generatedOtp) {
+      alert('Invalid OTP. Please try again.');
+      return;
+    }
+
     setIsVerifying(true);
     
     setTimeout(async () => {
@@ -168,7 +179,12 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
 
   const confirmBillPayment = () => {
     if (config.biometricEnabled || config.twoFactorEnabled) {
-      setSecurityType(config.biometricEnabled ? 'biometric' : '2fa');
+      const type = config.biometricEnabled ? 'biometric' : '2fa';
+      setSecurityType(type);
+      if (type === '2fa') {
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(newOtp);
+      }
       setShowSecurityModal(true);
     } else {
       handleSecurityVerify();
@@ -533,6 +549,11 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
                     ? 'Place your finger on the sensor to authorize this payment.' 
                     : 'Enter the 6-digit code sent to your phone.'}
                 </p>
+                {securityType === '2fa' && generatedOtp && (
+                  <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
+                    Test OTP: {generatedOtp}
+                  </div>
+                )}
               </div>
 
               {securityType === '2fa' && (

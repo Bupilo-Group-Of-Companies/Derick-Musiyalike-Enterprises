@@ -17,6 +17,7 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,7 +52,12 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
       if (user) {
         setStep('forgot-otp');
         setError('');
-        alert('OTP sent to your phone: 123456'); // Simulation
+        // Generate 6-digit secure OTP
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        const newOtp = (array[0] % 900000 + 100000).toString();
+        setGeneratedOtp(newOtp);
+        console.log('OTP Sent to +260' + phone + ': ' + newOtp);
       } else {
         setError('Phone number not registered');
       }
@@ -62,7 +68,7 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
   };
 
   const handleVerifyOtp = () => {
-    if (otp === '123456') {
+    if (otp === generatedOtp) {
       setStep('forgot-reset');
       setError('');
     } else {
@@ -247,6 +253,11 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
                   <p className="text-[#666] text-sm mt-2 leading-relaxed">
                     Enter the 6-digit code sent to your phone.
                   </p>
+                  {generatedOtp && (
+                    <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
+                      Test OTP: {generatedOtp}
+                    </div>
+                  )}
                 </div>
 
                 {error && (

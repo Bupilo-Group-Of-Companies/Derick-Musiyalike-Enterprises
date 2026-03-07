@@ -61,11 +61,14 @@ import { User, LoanRequest, ChatMessage, Agent, Meeting, StreamingApp, AppReques
 
 import SupportChat from './SupportChat';
 import LiveMeeting from './LiveMeeting';
+import ZoomControl from './ZoomControl';
 
 interface AdminPanelProps {
   onLogout: () => void;
   isDeveloper?: boolean;
 }
+
+import { sendPushNotification } from '../utils/notifications';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(isDeveloper || false);
@@ -77,8 +80,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [streamingApps, setStreamingApps] = useState<StreamingApp[]>([]);
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'services' | 'system' | 'workplace' | 'storage' | 'chat' | 'agents' | 'meetings' | 'streaming' | 'app-request' | 'live-meeting' | 'transactions'>('workplace');
+  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'services' | 'system' | 'workplace' | 'storage' | 'chat' | 'agents' | 'meetings' | 'streaming' | 'app-request' | 'live-meeting' | 'transactions' | 'approved-apps'>('workplace');
   const [searchTerm, setSearchTerm] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('moneylink_recent_searches');
+    if (saved) {
+      setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (term.trim() && !recentSearches.includes(term.trim())) {
+      const updated = [term.trim(), ...recentSearches].slice(0, 5);
+      setRecentSearches(updated);
+      localStorage.setItem('moneylink_recent_searches', JSON.stringify(updated));
+    }
+  };
   const [selectedUserForChat, setSelectedUserForChat] = useState<User | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -88,10 +109,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const [currentAdmin, setCurrentAdmin] = useState<Admin | null>(null);
   const [requestedAppName, setRequestedAppName] = useState('');
+  const [appIcon, setAppIcon] = useState<string | null>(null); // New state
   const [desiredUsername, setDesiredUsername] = useState('');
   const [desiredPassword, setDesiredPassword] = useState('');
   const [myAppRequests, setMyAppRequests] = useState<AppRequest[]>([]);
-  const [files, setFiles] = useState<{ id: string, name: string, size: string, type: string, date: string, content?: string }[]>([]);
+  const [files, setFiles] = useState<{ id: string, name: string, size: string, type: string, date: string, content?: string, folderId?: string | null }[]>([]);
+  const [folders, setFolders] = useState<{ id: string, name: string, parentId: string | null }[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  const createFolder = (name: string) => {
+    const newFolder = { id: Math.random().toString(36).substr(2, 9), name, parentId: currentFolderId };
+    setFolders([...folders, newFolder]);
+  };
+
+  const deleteFolder = (id: string) => {
+    setFolders(folders.filter(f => f.id !== id));
+    setFiles(files.filter(f => f.folderId !== id));
+  };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txFilterType, setTxFilterType] = useState<string>('all');
   const [txDateRange, setTxDateRange] = useState<string>('all');
@@ -306,6 +340,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       id: Date.now().toString(),
       adminId: currentAdminId || 'unknown',
       requestedName: requestedAppName,
+      appIcon: appIcon || undefined, // Add icon
       status: 'pending',
       createdBy: adminUser,
       createdAt: new Date().toISOString(),
@@ -321,6 +356,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
     
     setMyAppRequests(prev => [newRequest, ...prev]);
     setRequestedAppName('');
+    setAppIcon(null); // Reset
     setDesiredUsername('');
     setDesiredPassword('');
     alert('App Name Request submitted to Developer for approval!');
@@ -502,7 +538,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
         size: (file.size / 1024).toFixed(2) + ' KB',
         type: file.type,
         date: new Date().toLocaleDateString(),
-        content: event.target?.result as string
+        content: event.target?.result as string,
+        folderId: currentFolderId
       };
       const updatedFiles = [newFile, ...files];
       setFiles(updatedFiles);
@@ -639,6 +676,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       
       // Trigger PDF Download
       downloadLoanApproval(request);
+      sendPushNotification('Loan Approved', { body: `Loan of K ${request.amount} approved for ${request.userName}.` });
       
       alert(`Loan of K ${request.amount} approved for ${request.userName}. Approval PDF downloaded.`);
     } catch (error) {
@@ -683,6 +721,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       
       // Trigger PDF Download
       downloadLoanApproval(request);
+      sendPushNotification('Loan Approved', { body: `Loan of K ${request.amount} approved for ${request.userName}.` });
       
       alert(`Loan of K ${request.amount} approved for ${request.userName}. Approval PDF downloaded.`);
     }
@@ -735,6 +774,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
         req.id === requestId ? updatedRequest : req
       );
       setLoanRequests(updatedRequests);
+      sendPushNotification('Loan Rejected', { body: `Loan request ${requestId} has been rejected.` });
     } catch (error) {
       console.error('Failed to reject loan via API, falling back to local storage', error);
       const updatedRequests = loanRequests.map(req => 
@@ -991,6 +1031,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
             App Request
           </button>
           <button
+            onClick={() => setActiveTab('approved-apps')}
+            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'approved-apps' ? 'bg-white shadow-sm text-green-700' : 'text-[#666]'
+            }`}>
+            <CheckCircle className="w-4 h-4" />
+            Approved Apps
+          </button>
+          <button
             onClick={() => setActiveTab('transactions')}
             className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
               activeTab === 'transactions' ? 'bg-white shadow-sm text-green-700' : 'text-[#666]'
@@ -1002,15 +1050,52 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
 
         <div className="bg-white rounded-[2rem] border border-[#E5E5E5] shadow-sm overflow-hidden">
           {activeTab !== 'workplace' && (
-            <div className="p-6 border-b border-[#F0F0F0] flex items-center gap-4">
+            <div className="p-6 border-b border-[#F0F0F0] flex items-center gap-4 relative">
               <Search className="w-5 h-5 text-[#999]" />
               <input 
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => setShowRecentSearches(true)}
+                onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(searchTerm);
+                    setShowRecentSearches(false);
+                  }
+                }}
                 className="flex-1 bg-transparent border-none outline-none text-sm font-medium"
               />
+              {showRecentSearches && recentSearches.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-[#E5E5E5] rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-2 bg-[#F8F9FA] border-b border-[#E5E5E5] text-[10px] font-bold text-[#999] flex justify-between items-center">
+                    RECENT SEARCHES
+                    <button 
+                      onClick={() => {
+                        setRecentSearches([]);
+                        localStorage.removeItem('moneylink_recent_searches');
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {recentSearches.map((term, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setSearchTerm(term);
+                        setShowRecentSearches(false);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-[#F8F9FA] transition-colors flex items-center gap-2"
+                    >
+                      <Search className="w-3 h-3 text-[#999]" />
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              )}
               {activeTab === 'users' && (
                 <div className="flex gap-2">
                   <button 
@@ -1050,7 +1135,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                         <p className="text-[10px] text-[#999]">Tax ID: {agent.taxId}</p>
                         <p className="text-[10px] text-green-700 font-bold mt-1">STATUS: {agent.status.toUpperCase()}</p>
                       </div>
-                      <button className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg">
+                      <button 
+                        onClick={async () => {
+                          const newPhone = prompt('Edit Agent Phone:', agent.phone);
+                          if (newPhone) {
+                            const updatedAgent = { ...agent, phone: newPhone };
+                            await fetch(`/api/agents/${agent.id}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(updatedAgent)
+                            });
+                            setAgents(prev => prev.map(a => a.id === agent.id ? updatedAgent : a));
+                          }
+                        }}
+                        className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"
+                      >
                         <Settings className="w-4 h-4" />
                       </button>
                     </div>
@@ -1172,6 +1271,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                     className="w-full px-6 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-bold outline-none focus:border-blue-600"
                   />
                   <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setAppIcon(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full p-3 bg-white/5 rounded-xl border border-white/10"
+                  />
+                  {appIcon && <img src={appIcon} alt="Preview" className="w-20 h-20 rounded-lg" />}
+                  <input 
                     type="text" 
                     placeholder="Create Your Admin Username" 
                     value={desiredUsername}
@@ -1191,6 +1304,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                   >
                     SUBMIT_REQUEST
                   </button>
+                </div>
+              </div>
+            ) : activeTab === 'approved-apps' ? (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold">Approved Apps</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {myAppRequests.filter(r => r.status === 'approved').map(app => (
+                    <div key={app.id} className="p-6 bg-white border border-[#E5E5E5] rounded-2xl shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="w-16 h-16 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mb-4 overflow-hidden">
+                          {app.appIcon ? <img src={app.appIcon} alt="App Icon" className="w-full h-full object-cover" /> : <Globe className="w-8 h-8" />}
+                        </div>
+                        <p className="font-bold text-sm">{app.requestedName}</p>
+                        <p className="text-[10px] text-[#999]">Status: Approved</p>
+                      </div>
+                      {app.downloadUrl && (
+                        <a 
+                          href={app.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-4 w-full py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                        >
+                          <Download className="w-4 h-4" /> Download APK
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                  {myAppRequests.filter(r => r.status === 'approved').length === 0 && (
+                    <p className="text-sm text-[#999]">No approved apps yet.</p>
+                  )}
                 </div>
               </div>
             ) : activeTab === 'live-meeting' ? (
@@ -1699,16 +1842,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
             ) : activeTab === 'storage' ? (
               <div className="p-8 space-y-8">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-black">Cloud Storage</h2>
-                  <label className="px-6 py-3 bg-green-700 text-white rounded-2xl font-bold text-xs cursor-pointer hover:bg-green-800 transition-all flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    UPLOAD_FILE
-                    <input type="file" className="hidden" onChange={handleFileUpload} />
-                  </label>
+                  <h2 className="text-2xl font-black">Cloud Storage {currentFolderId && `> ${folders.find(f => f.id === currentFolderId)?.name}`}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                        const name = prompt('Folder name:');
+                        if (name) createFolder(name);
+                      }} className="px-6 py-3 bg-white border border-[#E5E5E5] text-green-700 rounded-2xl font-bold text-xs hover:bg-green-50 transition-all flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> NEW_FOLDER
+                    </button>
+                    <label className="px-6 py-3 bg-green-700 text-white rounded-2xl font-bold text-xs cursor-pointer hover:bg-green-800 transition-all flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> UPLOAD_FILE
+                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {files.map(file => (
+                  {folders.filter(f => f.parentId === currentFolderId).map(folder => (
+                    <div key={folder.id} className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm group relative flex flex-col items-center justify-center cursor-pointer hover:border-green-700 transition-all" onClick={() => setCurrentFolderId(folder.id)}>
+                      <div className="w-12 h-12 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mb-4">
+                        <Database className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-sm truncate">{folder.name}</p>
+                      <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="absolute top-2 right-2 p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {files.filter(f => f.folderId === currentFolderId).map(file => (
                     <div key={file.id} className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm group relative">
                       <div className="w-12 h-12 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mb-4">
                         <FileText className="w-6 h-6" />
@@ -1733,12 +1894,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                       </div>
                     </div>
                   ))}
-                  {files.length === 0 && (
+                  {files.filter(f => f.folderId === currentFolderId).length === 0 && folders.filter(f => f.parentId === currentFolderId).length === 0 && (
                     <div className="col-span-full py-20 text-center border-2 border-dashed border-[#E5E5E5] rounded-[3rem]">
                       <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Database className="w-8 h-8" />
                       </div>
-                      <p className="text-sm font-bold text-[#999]">No files uploaded yet</p>
+                      <p className="text-sm font-bold text-[#999]">No files or folders in this location</p>
                     </div>
                   )}
                 </div>
@@ -2117,6 +2278,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
           )}
         </AnimatePresence>
         <SupportChat currentUser={null} role="admin" config={config} />
+        <ZoomControl />
       </div>
     </div>
   );
