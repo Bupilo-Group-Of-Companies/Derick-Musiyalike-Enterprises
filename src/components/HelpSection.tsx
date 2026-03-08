@@ -31,12 +31,45 @@ const HelpSection: React.FC<HelpSectionProps> = ({ onBack }) => {
         <h3 className="font-bold text-sm mb-4">Frequently Asked Questions</h3>
         <div className="space-y-4">
           {faqs.map((faq, index) => (
-            <div key={index} className="border-b border-[#F0F0F0] pb-4">
+            <div key={index} className="border-b border-[#F0F0F0] pb-4 last:border-0 last:pb-0">
               <p className="font-bold text-sm">{faq.q}</p>
               <p className="text-sm text-[#666] mt-1">{faq.a}</p>
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-green-700 text-white p-8 rounded-[2rem] shadow-xl">
+        <h3 className="font-bold text-lg mb-4">Need more help?</h3>
+        <p className="text-sm opacity-90 mb-6">Our support team is available 24/7 to assist you with any issues.</p>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 bg-white/10 p-4 rounded-xl">
+            <div className="w-10 h-10 bg-white text-green-700 rounded-full flex items-center justify-center font-bold">
+              PH
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase opacity-70">Phone Support</p>
+              <p className="font-mono font-bold">+260 977 123 456</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 bg-white/10 p-4 rounded-xl">
+            <div className="w-10 h-10 bg-white text-green-700 rounded-full flex items-center justify-center font-bold">
+              EM
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase opacity-70">Email Support</p>
+              <p className="font-mono font-bold">support@moneylink.zm</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center space-y-4 pb-8">
+        <button className="text-xs font-bold text-[#666] hover:text-green-700 underline">Terms of Service</button>
+        <span className="text-[#CCC] mx-2">•</span>
+        <button className="text-xs font-bold text-[#666] hover:text-green-700 underline">Privacy Policy</button>
       </div>
     </div>
   );

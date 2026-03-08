@@ -88,7 +88,8 @@ const SupportChat: React.FC<SupportChatProps> = ({ currentUser, role = 'user', c
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+    const textToSend = newMessage.trim();
+    if (!textToSend) return;
 
     const senderId = role === 'user' ? (currentUser?.id || 'guest') : role;
 
@@ -96,56 +97,58 @@ const SupportChat: React.FC<SupportChatProps> = ({ currentUser, role = 'user', c
       id: Math.random().toString(36).substr(2, 9),
       senderId: senderId,
       receiverId: 'ai',
-      text: newMessage,
+      text: textToSend,
       timestamp: new Date().toISOString(),
       isAdmin: role !== 'user'
     };
 
+    // Optimistic update
     const updatedMessages = [...messages, msg];
     setMessages(updatedMessages);
-    
-    try {
-      await fetch('/api/chat-messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...msg, chatId })
-      });
-    } catch (error) {
-      console.error('Failed to save message via API, falling back to local storage', error);
-      localStorage.setItem(`moneylink_chats_${chatId}`, JSON.stringify(updatedMessages));
-    }
-
+    localStorage.setItem(`moneylink_chats_${chatId}`, JSON.stringify(updatedMessages));
     setNewMessage('');
     setIsTyping(true);
+    
+    // Save user message in background
+    fetch('/api/chat-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...msg, chatId })
+    }).catch(error => console.error('Failed to save message via API', error));
 
-    // Generate AI Response
+    // Generate AI Response with minimum delay
     const context = `User Role: ${role}. User Name: ${currentUser?.name || 'Guest'}. Platform: ${config.appName} (Derick Musiyalike Institution). ${role === 'admin' || role === 'agent' ? 'You are helping the staff member write a professional response or perform a task.' : 'You are helping a customer.'}`;
-    const aiText = await generateAIResponse(newMessage, context);
-
-    const aiMsg: ChatMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      senderId: 'ai',
-      receiverId: senderId,
-      text: aiText,
-      timestamp: new Date().toISOString(),
-      isAdmin: true
-    };
-
-    const finalMessages = [...updatedMessages, aiMsg];
-    setMessages(finalMessages);
     
     try {
-      await fetch('/api/chat-messages', {
+      const [aiText] = await Promise.all([
+        generateAIResponse(textToSend, context),
+        new Promise(resolve => setTimeout(resolve, 1500)) // Minimum 1.5s delay for "thinking" simulation
+      ]);
+
+      const aiMsg: ChatMessage = {
+        id: Math.random().toString(36).substr(2, 9),
+        senderId: 'ai',
+        receiverId: senderId,
+        text: aiText,
+        timestamp: new Date().toISOString(),
+        isAdmin: true
+      };
+
+      const finalMessages = [...updatedMessages, aiMsg];
+      setMessages(finalMessages);
+      localStorage.setItem(`moneylink_chats_${chatId}`, JSON.stringify(finalMessages));
+      
+      // Save AI message in background
+      fetch('/api/chat-messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...aiMsg, chatId })
-      });
+      }).catch(error => console.error('Failed to save AI message via API', error));
     } catch (error) {
-      console.error('Failed to save AI message via API, falling back to local storage', error);
-      localStorage.setItem(`moneylink_chats_${chatId}`, JSON.stringify(finalMessages));
+      console.error('AI generation failed', error);
+    } finally {
+      setIsTyping(false);
     }
-    
-    setIsTyping(false);
   };
 
   const useAiResponse = (text: string) => {

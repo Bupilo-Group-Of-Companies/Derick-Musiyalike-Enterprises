@@ -15,7 +15,8 @@ import {
   FileText,
   HelpCircle,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Calculator
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useZoom } from './contexts/ZoomContext';
@@ -36,12 +37,15 @@ import LocationTracker from './components/LocationTracker';
 import NotificationsPanel from './components/NotificationsPanel';
 import AgentLogin from './components/AgentLogin';
 import AIServicesSection from './components/AIServicesSection';
+import TaxSection from './components/TaxSection';
 import LockScreen from './components/LockScreen';
 import VerticalScale from './components/VerticalScale';
 import { Section, User, SystemConfig, AppNotification, Agent } from './types';
 
 const App: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<Section>('home');
+  const [activeSection, setActiveSection] = useState<Section>(() => {
+    return (sessionStorage.getItem('moneylink_active_section') as Section) || 'home';
+  });
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -55,7 +59,35 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const { zoom } = useZoom();
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLocked, setIsLocked] = useState(() => {
+    return sessionStorage.getItem('moneylink_is_locked') === 'true';
+  });
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Persist state
+  useEffect(() => {
+    sessionStorage.setItem('moneylink_active_section', activeSection);
+  }, [activeSection]);
+
+  useEffect(() => {
+    sessionStorage.setItem('moneylink_is_locked', String(isLocked));
+  }, [isLocked]);
+
+  // Prevent accidental reloads
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentUser) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentUser]);
 
   // Idle Logout
   useEffect(() => {
@@ -103,7 +135,6 @@ const App: React.FC = () => {
       document.body.classList.remove('partner-mode');
     }
 
-    const savedUser = localStorage.getItem('moneylink_current_user');
     const fetchWithFallback = async (url: string, fallback: any = []) => {
       try {
         const res = await fetch(url);
@@ -115,6 +146,28 @@ const App: React.FC = () => {
       }
     };
 
+    const directLogin = localStorage.getItem('moneylink_admin_direct_login');
+    if (directLogin === 'true') {
+      setIsAdminMode(true);
+      localStorage.removeItem('moneylink_admin_direct_login');
+    }
+    
+    const directAgentLogin = localStorage.getItem('moneylink_agent_direct_login');
+    if (directAgentLogin === 'true') {
+      const agentId = localStorage.getItem('moneylink_current_agent_id');
+      if (agentId) {
+        fetchWithFallback(`/api/agents`)
+          .then(agents => {
+            const agent = agents.find((a: any) => a.id === agentId);
+            if (agent) {
+              handleAgentLogin(agent);
+            }
+          });
+      }
+      localStorage.removeItem('moneylink_agent_direct_login');
+    }
+    
+    const savedUser = localStorage.getItem('moneylink_current_user');
     if (savedUser) {
       const user = JSON.parse(savedUser);
       setCurrentUser(user);
@@ -277,7 +330,7 @@ const App: React.FC = () => {
       case 'transactions':
         return <TransactionsSection onBack={() => setActiveSection('home')} currentUser={currentUser} />;
       case 'settings':
-        return <SettingsSection onBack={() => setActiveSection('home')} onNavigate={setActiveSection} onDeveloperLogin={handleDeveloperLogin} />;
+        return <SettingsSection onBack={() => setActiveSection('home')} onNavigate={setActiveSection} onDeveloperLogin={handleDeveloperLogin} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />;
       case 'help':
         return <HelpSection onBack={() => setActiveSection('home')} />;
       case 'ai-lab':
@@ -286,17 +339,27 @@ const App: React.FC = () => {
           config={config} 
           role={isDeveloperMode ? 'developer' : isAdminMode ? 'admin' : 'user'}
         />;
+      case 'tax':
+        return <TaxSection currentUser={currentUser} />;
       case 'developer':
-        return <DeveloperPanel onLogout={() => {
-          setIsDeveloperMode(false);
-          setActiveSection('account');
-        }} />;
+        return <DeveloperPanel 
+          onBack={() => setActiveSection('home')}
+          onLogout={() => {
+            setIsDeveloperMode(false);
+            setActiveSection('account');
+          }} 
+        />;
       case 'agent':
-        return <AgentPanel onLogout={() => {
-          setIsAgentMode(false);
-          setCurrentAgent(null);
-          setActiveSection('home');
-        }} agentId={currentAgent?.id || ''} isDeveloper={isDeveloperMode} />;
+        return <AgentPanel 
+          onBack={() => setActiveSection('home')}
+          onLogout={() => {
+            setIsAgentMode(false);
+            setCurrentAgent(null);
+            setActiveSection('home');
+          }} 
+          agentId={currentAgent?.id || ''} 
+          isDeveloper={isDeveloperMode} 
+        />;
       default:
         return <Home 
           onNavigate={setActiveSection} 
@@ -313,19 +376,27 @@ const App: React.FC = () => {
 
   if (isAdminMode) {
     return (
-      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-        <AdminPanel onLogout={() => setIsAdminMode(false)} isDeveloper={isDeveloperMode} />
+      <div>
+        <AdminPanel 
+          onBack={() => setIsAdminMode(false)}
+          onLogout={() => setIsAdminMode(false)} 
+          isDeveloper={isDeveloperMode} 
+        />
       </div>
     );
   }
 
   if (isAgentMode) {
     return (
-      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-        <AgentPanel onLogout={() => {
-          setIsAgentMode(false);
-          setCurrentAgent(null);
-        }} agentId={currentAgent?.id || ''} />
+      <div>
+        <AgentPanel 
+          onBack={() => setIsAgentMode(false)}
+          onLogout={() => {
+            setIsAgentMode(false);
+            setCurrentAgent(null);
+          }} 
+          agentId={currentAgent?.id || ''} 
+        />
       </div>
     );
   }
@@ -382,7 +453,7 @@ const App: React.FC = () => {
           className="absolute bottom-8 left-0 right-0 text-center"
         >
           <p className="text-[8px] text-white/30 font-bold uppercase tracking-[0.2em]">Developed By</p>
-          <p className="text-[10px] text-white/50 font-black">DERICK MUSIYALIKE INSTITUTION</p>
+          <p className="text-[10px] text-white/50 font-black">DMI GROUP</p>
         </motion.div>
 
         {/* Decorative Background */}
@@ -401,14 +472,15 @@ const App: React.FC = () => {
     { id: 'account', label: 'Account', icon: UserIcon },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'ai-lab', label: 'AI Lab', icon: Sparkles },
+    { id: 'tax', label: 'Tax', icon: Calculator },
     { id: 'help', label: 'Help & Support', icon: HelpCircle },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-green-100 selection:text-green-900">
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-[#F8F9FA] text-[#1A1A1A]'} font-sans selection:bg-green-100 selection:text-green-900`}>
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-[#F0F0F0]">
-        <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-between">
+      <header className={`fixed top-0 left-0 right-0 ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white/80 border-[#F0F0F0]'} backdrop-blur-md z-50 border-b`}>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {activeSection !== 'home' && (
               <button 
@@ -530,27 +602,29 @@ const App: React.FC = () => {
       <VerticalScale />
 
       {/* Main Content */}
-      <main className="max-w-md mx-auto pt-24 pb-32 px-6 min-h-screen flex flex-col overflow-y-auto">
-        <div className="flex-1" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeSection}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderSection()}
-            </motion.div>
-          </AnimatePresence>
+      <main className={`w-full max-w-[1920px] mx-auto pt-24 pb-32 px-4 sm:px-6 lg:px-8 min-h-screen flex flex-col ${isDarkMode ? 'text-white' : 'text-[#1A1A1A]'}`}>
+        <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+          <div className="flex-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {renderSection()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Global Developer Credit */}
         <div className="mt-12 mb-8 text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
-          <p className="text-[9px] font-bold text-[#999] uppercase tracking-[0.3em]">Official Developer</p>
+          <p className={`text-[9px] font-bold ${isDarkMode ? 'text-gray-400' : 'text-[#999]'} uppercase tracking-[0.3em]`}>Official Developer</p>
           <div className="space-y-0.5">
-            <p className="text-[11px] font-black text-[#1A1A1A]">DERICK MUSIYALIKE INSTITUTION</p>
-            <p className="text-[9px] text-[#666] font-bold">Lusaka, Zambia</p>
+            <p className={`text-[11px] font-black ${isDarkMode ? 'text-white' : 'text-[#1A1A1A]'}`}>DMI GROUP</p>
+            <p className={`text-[9px] ${isDarkMode ? 'text-gray-500' : 'text-[#666]'} font-bold`}>Lusaka, Zambia</p>
           </div>
           <div className="flex justify-center gap-4">
             <a href="mailto:derickmusiyalikeinstitution@gmail.com" className="text-[9px] font-bold text-green-700 hover:underline">EMAIL</a>
@@ -621,7 +695,7 @@ const App: React.FC = () => {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-[#F0F0F0] z-50">
-        <div className="max-w-md mx-auto px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
           {navItems.map((item) => (
             <NavButton 
               key={item.id}
@@ -629,6 +703,7 @@ const App: React.FC = () => {
               icon={item.icon} 
               label={item.label} 
               onClick={() => setActiveSection(item.id as Section)} 
+              isDarkMode={isDarkMode}
             />
           ))}
         </div>
@@ -644,15 +719,15 @@ interface NavButtonProps {
   onClick: () => void;
 }
 
-const NavButton: React.FC<NavButtonProps> = ({ active, icon: Icon, label, onClick }) => (
+const NavButton: React.FC<NavButtonProps & { isDarkMode: boolean }> = ({ active, icon: Icon, label, onClick, isDarkMode }) => (
   <button 
     onClick={onClick}
-    className={`flex flex-col items-center gap-1.5 transition-all relative group ${active ? 'text-green-700' : 'text-[#999] hover:text-[#666]'}`}
+    className={`flex flex-col items-center gap-1.5 transition-all relative group ${active ? 'text-green-700' : isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-[#999] hover:text-[#666]'}`}
   >
     <div className={`p-2.5 rounded-2xl transition-all duration-300 ${
       active 
         ? 'bg-green-700 text-white shadow-lg shadow-green-700/20 scale-110' 
-        : 'bg-transparent group-hover:bg-[#F0F0F0] group-hover:scale-105'
+        : isDarkMode ? 'bg-transparent group-hover:bg-gray-800 group-hover:scale-105' : 'bg-transparent group-hover:bg-[#F0F0F0] group-hover:scale-105'
     }`}>
       <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : 'stroke-2'}`} />
     </div>

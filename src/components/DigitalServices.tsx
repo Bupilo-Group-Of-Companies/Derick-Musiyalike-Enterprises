@@ -287,7 +287,7 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
               <Bitcoin className="w-3 h-3 text-green-700" />
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {quickBills.map((bill) => (
               <button 
                 key={bill.name} 
@@ -346,7 +346,7 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
       {/* Network Links */}
       <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">
         <h3 className="font-bold text-sm mb-4">Network Services</h3>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button onClick={() => openBrowser('https://www.airtel.co.zm')} className="flex flex-col items-center gap-2 p-4 bg-red-50 rounded-2xl hover:bg-red-100 transition-colors">
             <Smartphone className="w-6 h-6 text-red-600" />
             <span className="text-[10px] font-bold text-red-700">Airtel</span>
@@ -551,7 +551,7 @@ const DigitalServices: React.FC<DigitalServicesProps> = ({ onBack, currentUser, 
                 </p>
                 {securityType === '2fa' && generatedOtp && (
                   <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
-                    Test OTP: {generatedOtp}
+                    OTP: {generatedOtp}
                   </div>
                 )}
               </div>

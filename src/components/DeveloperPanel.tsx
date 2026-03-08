@@ -40,9 +40,12 @@ import {
   Share2,
   Sparkles,
   Upload,
-  Search
+  Search,
+  ArrowLeft,
+  FileText,
+  CheckCircle
 } from 'lucide-react';
-import { User, AIServer, SystemConfig, Admin, AppRequest, Meeting, StreamingApp, Tool, Agent } from '../types';
+import { User, AIServer, SystemConfig, Admin, AppRequest, Meeting, StreamingApp, Tool, Agent, LoanRequest } from '../types';
 
 import SupportChat from './SupportChat';
 import AILab from './AILab';
@@ -51,12 +54,13 @@ import ZoomControl from './ZoomControl';
 
 interface DeveloperPanelProps {
   onLogout: () => void;
+  onBack?: () => void;
 }
 
 import { sendPushNotification } from '../utils/notifications';
 
-const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout }) => {
-  const [activePanel, setActivePanel] = useState<'system' | 'users' | 'agents' | 'ai' | 'database' | 'logs' | 'toolbox' | 'invitations' | 'memory' | 'admins' | 'app-requests' | 'meetings' | 'tools' | 'streaming' | 'storage' | 'browser' | 'code-editor' | 'ai-publish'>('system');
+const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout, onBack }) => {
+  const [activePanel, setActivePanel] = useState<'system' | 'users' | 'agents' | 'ai' | 'database' | 'logs' | 'toolbox' | 'invitations' | 'memory' | 'admins' | 'app-requests' | 'meetings' | 'tools' | 'streaming' | 'storage' | 'browser' | 'code-editor' | 'ai-publish' | 'loan-requests'>('system');
   const [config, setConfig] = useState<SystemConfig>({
     appName: 'MoneyLink Financial',
     appLogo: logo,
@@ -68,6 +72,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout }) => {
   });
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [loanRequests, setLoanRequests] = useState<LoanRequest[]>([]);
   const [appRequests, setAppRequests] = useState<AppRequest[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [streamingApps, setStreamingApps] = useState<StreamingApp[]>([]);
@@ -84,6 +89,12 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onLogout }) => {
       setRecentSearches(JSON.parse(saved));
     }
   }, []);
+
+  useEffect(() => {
+    if (admins.length > 0) {
+      localStorage.setItem('moneylink_admins', JSON.stringify(admins));
+    }
+  }, [admins]);
 
   const handleSearch = (term: string) => {
     setSearchQuery(term);
@@ -239,7 +250,7 @@ Development Team`);
       }
     };
 
-    const [adminsData, agentsData, requestsData, meetingsData, streamingData, toolsData, usersData, agentReqData] = await Promise.all([
+    const [adminsData, agentsData, requestsData, meetingsData, streamingData, toolsData, usersData, agentReqData, loanReqData] = await Promise.all([
       fetchWithFallback('/api/admins'),
       fetchWithFallback('/api/agents'),
       fetchWithFallback('/api/app-requests'),
@@ -247,7 +258,8 @@ Development Team`);
       fetchWithFallback('/api/streaming-apps?category=developer'),
       fetchWithFallback('/api/tools'),
       fetchWithFallback('/api/users'),
-      fetchWithFallback('/api/agent-requests')
+      fetchWithFallback('/api/agent-requests'),
+      fetchWithFallback('/api/loan-requests')
     ]);
     
     setAdmins(adminsData);
@@ -258,6 +270,7 @@ Development Team`);
     setTools(toolsData);
     setUsers(usersData);
     setAgentRequests(agentReqData);
+    setLoanRequests(loanReqData);
   };
 
   useEffect(() => {
@@ -646,17 +659,28 @@ Development Team`);
               />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tighter">{config.appName.toUpperCase()}</h1>
+              <h1 className="text-3xl font-black tracking-tighter">DMI GROUP DEVELOPER PANEL</h1>
               <p className="text-blue-400 text-xs font-bold uppercase tracking-widest">Main Operating System: Authorized</p>
             </div>
           </div>
-          <button 
-            onClick={onLogout}
-            className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-500 transition-all flex items-center gap-2 text-sm font-bold"
-          >
-            <LogOut className="w-4 h-4" />
-            TERMINATE_SESSION
-          </button>
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button 
+                onClick={onBack}
+                className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-blue-500/10 hover:border-blue-500/30 hover:text-blue-400 transition-all flex items-center gap-2 text-sm font-bold"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                RETURN_TO_APP
+              </button>
+            )}
+            <button 
+              onClick={onLogout}
+              className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-500 transition-all flex items-center gap-2 text-sm font-bold"
+            >
+              <LogOut className="w-4 h-4" />
+              TERMINATE_SESSION
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -732,6 +756,15 @@ Development Team`);
           >
             <Terminal className="w-4 h-4" />
             APP_BUILDER
+          </button>
+          <button
+            onClick={() => setActivePanel('loan-requests')}
+            className={`px-6 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activePanel === 'loan-requests' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            LOAN_REQUESTS
           </button>
           <button
             onClick={() => setActivePanel('logs')}
@@ -1540,6 +1573,16 @@ Development Team`);
                       <div className="flex gap-2">
                         <button 
                           onClick={() => {
+                            const updatedUser = { ...user, isVerified: !user.isVerified };
+                            handleUpdateUser(updatedUser);
+                          }}
+                          className={`p-2 rounded-lg transition-all ${user.isVerified ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-white/40'}`}
+                          title={user.isVerified ? 'Verified' : 'Verify User'}
+                        >
+                          <Shield className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
                             const newBalance = prompt(`Enter new balance for ${user.name}:`, (user.balance || 0).toString());
                             if (newBalance !== null) {
                               const updatedUser = { ...user, balance: parseFloat(newBalance) };
@@ -1644,6 +1687,17 @@ Development Team`);
                               
                               setAgents([...agents, newAgent]);
                               setAgentRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
+                              
+                              // Create Admin Storage Folder for Agent
+                              const storedFolders = JSON.parse(localStorage.getItem('moneylink_admin_folders') || '[]');
+                              const folderId = Math.random().toString(36).substr(2, 9);
+                              storedFolders.push({
+                                id: folderId,
+                                name: `Agent: ${newAgent.name}`,
+                                parentId: null
+                              });
+                              localStorage.setItem('moneylink_admin_folders', JSON.stringify(storedFolders));
+
                               alert('Agent Approved!');
                             }}
                             className="p-2 bg-green-600/20 hover:bg-green-600/40 rounded-lg text-green-400 transition-all"
@@ -2168,6 +2222,85 @@ Development Team`);
               </motion.div>
             )}
 
+            {activePanel === 'loan-requests' && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <h2 className="text-xl font-bold">Loan Requests</h2>
+                  <span className="text-[10px] font-bold bg-amber-600 px-2 py-1 rounded-md">{loanRequests.filter(r => r.status === 'pending').length} PENDING</span>
+                </div>
+                <div className="space-y-4">
+                  {loanRequests.map(req => (
+                    <div key={`dev-loan-${req.id}`} className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-sm">{req.userName}</p>
+                        <p className="text-[10px] text-white/40">{req.type} | K {req.amount.toLocaleString()}</p>
+                        <p className={`text-[8px] font-bold mt-1 uppercase ${
+                          req.status === 'approved' ? 'text-green-400' : 
+                          req.status === 'rejected' ? 'text-red-400' : 'text-amber-400'
+                        }`}>
+                          {req.status}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {req.status === 'pending' && (
+                          <>
+                            <button 
+                              onClick={async () => {
+                                await fetch(`/api/loan-requests/${req.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'approved' })
+                                });
+                                setLoanRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
+                                alert('Loan Approved!');
+                              }}
+                              className="p-2 bg-green-600/20 hover:bg-green-600/40 rounded-lg text-green-400 transition-all"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                await fetch(`/api/loan-requests/${req.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'rejected' })
+                                });
+                                setLoanRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'rejected' } : r));
+                              }}
+                              className="p-2 bg-red-600/20 hover:bg-red-600/40 rounded-lg text-red-400 transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        <button 
+                          onClick={() => {
+                            if (confirm('Delete this loan request?')) {
+                              fetch(`/api/loan-requests/${req.id}`, { method: 'DELETE' })
+                                .then(() => setLoanRequests(prev => prev.filter(r => r.id !== req.id)));
+                            }
+                          }}
+                          className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {loanRequests.length === 0 && (
+                    <div className="text-center py-12 text-white/20">
+                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                      <p className="text-sm font-medium">No loan requests found.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             {activePanel === 'logs' && (
               <motion.div 
                 initial={{ opacity: 0, x: -20 }}
@@ -2284,7 +2417,6 @@ Development Team`);
         </div>
       </div>
       <SupportChat currentUser={null} role="developer" config={config} />
-      <ZoomControl />
     </div>
   );
 };

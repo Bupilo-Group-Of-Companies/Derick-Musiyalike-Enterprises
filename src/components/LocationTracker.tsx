@@ -14,6 +14,7 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({ currentUser, config }
     if (!currentUser) return;
 
     const updateLocation = (position: GeolocationPosition) => {
+      setError(null); // Clear any previous errors
       const { latitude, longitude } = position.coords;
       const timestamp = new Date().toISOString();
 

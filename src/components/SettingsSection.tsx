@@ -8,11 +8,11 @@ interface SettingsSectionProps {
   onBack: () => void;
   onNavigate: (section: Section) => void;
   onDeveloperLogin?: () => void;
+  isDarkMode: boolean;
+  setIsDarkMode: (isDarkMode: boolean) => void;
 }
 
-const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, onDeveloperLogin }) => {
-  // Mock state for theme
-  const [theme, setTheme] = React.useState('light');
+const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, onDeveloperLogin, isDarkMode, setIsDarkMode }) => {
   const [showDevLogin, setShowDevLogin] = useState(false);
   const [devUsername, setDevUsername] = useState('');
   const [devPassword, setDevPassword] = useState('');
@@ -21,18 +21,24 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
   const { zoom, setZoom } = useZoom();
   const [config, setConfig] = useState<any>({
     appName: 'MoneyLink',
-    appLogo: 'https://storage.googleapis.com/static.aistudio.google.com/content/2026/02/25/08/46/27/95/96/image.png'
+    appLogo: 'https://storage.googleapis.com/static.aistudio.google.com/content/2026/02/25/08/46/27/95/96/image.png',
+    biometricEnabled: false
   });
 
   React.useEffect(() => {
     const storedConfig = JSON.parse(localStorage.getItem('moneylink_config') || '{}');
-    if (storedConfig.appLogo) {
-      setConfig((prev: any) => ({ ...prev, appLogo: storedConfig.appLogo }));
-    }
-    if (storedConfig.appName) {
-      setConfig((prev: any) => ({ ...prev, appName: storedConfig.appName }));
-    }
+    setConfig((prev: any) => ({ ...prev, ...storedConfig }));
   }, []);
+
+  const updateConfig = (newConfig: any) => {
+    setConfig(newConfig);
+    localStorage.setItem('moneylink_config', JSON.stringify(newConfig));
+  };
+
+  const toggleBiometric = () => {
+    const newConfig = { ...config, biometricEnabled: !config.biometricEnabled };
+    updateConfig(newConfig);
+  };
 
   const handleDevLogin = () => {
     if (devUsername === 'BISHOP' && devPassword === 'DERICK') {
@@ -64,21 +70,25 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ onBack, onNavigate, o
       </div>
 
       <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">
+        <h3 className="font-bold text-sm mb-4">Security</h3>
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-medium text-sm">Biometric Login</p>
+          <button 
+            onClick={toggleBiometric}
+            className={`w-12 h-6 rounded-full transition-all relative ${config.biometricEnabled ? 'bg-green-700' : 'bg-gray-300'}`}
+          >
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${config.biometricEnabled ? 'right-1' : 'left-1'}`}></div>
+          </button>
+        </div>
         <h3 className="font-bold text-sm mb-4">Appearance</h3>
         <div className="flex items-center justify-between mb-4">
-          <p className="font-medium text-sm">Theme</p>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setTheme('light')}
-              className={`p-2 rounded-lg ${theme === 'light' ? 'bg-green-700 text-white' : 'bg-[#F0F0F0]'}`}>
-              <Sun className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={() => setTheme('dark')}
-              className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-green-700 text-white' : 'bg-[#F0F0F0]'}`}>
-              <Moon className="w-5 h-5" />
-            </button>
-          </div>
+          <p className="font-medium text-sm">Dark Mode</p>
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`w-12 h-6 rounded-full transition-all relative ${isDarkMode ? 'bg-green-700' : 'bg-gray-300'}`}
+          >
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isDarkMode ? 'right-1' : 'left-1'}`}></div>
+          </button>
         </div>
         <h3 className="font-bold text-sm mb-4">Zoom Level</h3>
         <input 

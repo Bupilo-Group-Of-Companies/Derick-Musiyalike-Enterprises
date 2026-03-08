@@ -28,9 +28,11 @@ import {
   generateImageWithAspectRatio, 
   animateImageWithVeo, 
   editImageWithText, 
-  getMapsGroundingResponse 
+  getMapsGroundingResponse,
+  generateLabResponse
 } from '../services/aiService';
 import { GoogleGenAI, Modality } from "@google/genai";
+import { Settings, Save, Trash2, ChevronDown } from 'lucide-react';
 
 interface AIServicesSectionProps {
   onBack: () => void;
@@ -39,7 +41,7 @@ interface AIServicesSectionProps {
 }
 
 const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, role }) => {
-  const [activeTab, setActiveTab] = useState<'thinking' | 'voice' | 'media' | 'creator' | 'maps' | 'requests'>('thinking');
+  const [activeTab, setActiveTab] = useState<'thinking' | 'voice' | 'media' | 'creator' | 'maps' | 'requests' | 'lab'>('thinking');
   const [isLoading, setIsLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState<any>(null);
@@ -49,10 +51,18 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
+  // Lab specific states
+  const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
+  const [temperature, setTemperature] = useState(0.7);
+  const [topP, setTopP] = useState(0.95);
+  const [savedPrompts, setSavedPrompts] = useState<{id: string, name: string, text: string}[]>([]);
+  const [showSavedPrompts, setShowSavedPrompts] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const availableTabs = [
     { id: 'thinking', label: 'Thinking', icon: Brain, roles: ['user', 'admin', 'developer'] },
+    { id: 'lab', label: 'AI Lab', icon: Settings, roles: ['developer'] },
     { id: 'voice', label: 'Voice', icon: Mic, roles: ['admin', 'developer'] },
     { id: 'media', label: 'Media', icon: Video, roles: ['admin', 'developer'] },
     { id: 'creator', label: 'Creator', icon: Sparkles, roles: ['developer'] },
@@ -61,6 +71,28 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
   ].filter(tab => tab.roles.includes(role));
 
   const [requests, setRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    const storedPrompts = JSON.parse(localStorage.getItem('moneylink_saved_prompts') || '[]');
+    setSavedPrompts(storedPrompts);
+  }, []);
+
+  const saveCurrentPrompt = () => {
+    if (!prompt.trim()) return;
+    const name = window.prompt("Enter a name for this prompt:");
+    if (!name) return;
+    
+    const newPrompt = { id: Date.now().toString(), name, text: prompt };
+    const updated = [...savedPrompts, newPrompt];
+    setSavedPrompts(updated);
+    localStorage.setItem('moneylink_saved_prompts', JSON.stringify(updated));
+  };
+
+  const deleteSavedPrompt = (id: string) => {
+    const updated = savedPrompts.filter(p => p.id !== id);
+    setSavedPrompts(updated);
+    localStorage.setItem('moneylink_saved_prompts', JSON.stringify(updated));
+  };
 
   useEffect(() => {
     if (activeTab === 'requests') {
@@ -135,6 +167,10 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
       switch (activeTab) {
         case 'thinking':
           result = await generateThinkingResponse(prompt);
+          setResponse(result);
+          break;
+        case 'lab':
+          result = await generateLabResponse(prompt, selectedModel, { temperature, topP });
           setResponse(result);
           break;
         case 'voice':
@@ -310,6 +346,7 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={
                     activeTab === 'thinking' ? "Ask a complex reasoning question..." :
+                    activeTab === 'lab' ? "Experiment with prompts and parameters..." :
                     activeTab === 'voice' ? "What would you like to talk about?" :
                     activeTab === 'media' ? "Describe what you want to find in the video..." :
                     activeTab === 'creator' ? "Describe the image or video to create..." :
@@ -317,7 +354,114 @@ const AIServicesSection: React.FC<AIServicesSectionProps> = ({ onBack, config, r
                   }
                   className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-emerald-500/50 transition-colors min-h-[120px] resize-none"
                 />
+                {role === 'developer' && (
+                  <div className="flex justify-between items-center mt-2">
+                    <button 
+                      onClick={() => setShowSavedPrompts(!showSavedPrompts)}
+                      className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300"
+                    >
+                      <FileText className="w-3 h-3" />
+                      {showSavedPrompts ? 'Hide Saved' : 'Load Saved Prompt'}
+                    </button>
+                    <button 
+                      onClick={saveCurrentPrompt}
+                      className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1 hover:text-blue-300"
+                    >
+                      <Save className="w-3 h-3" />
+                      Save Prompt
+                    </button>
+                  </div>
+                )}
+                
+                <AnimatePresence>
+                  {showSavedPrompts && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-2 space-y-2"
+                    >
+                      {savedPrompts.length === 0 ? (
+                        <p className="text-[10px] text-white/20 italic">No saved prompts yet.</p>
+                      ) : (
+                        savedPrompts.map(p => (
+                          <div key={p.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/5 group">
+                            <button 
+                              onClick={() => {
+                                setPrompt(p.text);
+                                setShowSavedPrompts(false);
+                              }}
+                              className="text-[10px] text-white/60 hover:text-white truncate flex-1 text-left"
+                            >
+                              {p.name}
+                            </button>
+                            <button 
+                              onClick={() => deleteSavedPrompt(p.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 transition-all"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+
+              {activeTab === 'lab' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Model Selection</label>
+                    <div className="relative">
+                      <select 
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold appearance-none outline-none focus:border-emerald-500/50"
+                      >
+                        <option value="gemini-3.1-pro-preview" className="bg-[#1A1A1A]">Gemini 3.1 Pro (Advanced Reasoning)</option>
+                        <option value="gemini-3-flash-preview" className="bg-[#1A1A1A]">Gemini 3 Flash (Fast & Efficient)</option>
+                        <option value="gemini-2.5-flash" className="bg-[#1A1A1A]">Gemini 2.5 Flash (Balanced)</option>
+                        <option value="gemini-2.5-flash-preview-tts" className="bg-[#1A1A1A]">Gemini 2.5 TTS (Voice)</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Temperature</label>
+                        <span className="text-[10px] font-mono text-emerald-400">{temperature}</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.1" 
+                        value={temperature}
+                        onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                        className="w-full accent-emerald-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Top P</label>
+                        <span className="text-[10px] font-mono text-emerald-400">{topP}</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05" 
+                        value={topP}
+                        onChange={(e) => setTopP(parseFloat(e.target.value))}
+                        className="w-full accent-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(activeTab === 'media' || activeTab === 'creator') && (
                 <div className="space-y-4">

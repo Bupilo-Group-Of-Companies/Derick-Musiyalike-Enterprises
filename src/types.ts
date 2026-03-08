@@ -1,4 +1,4 @@
-export type Section = 'home' | 'apply-loan' | 'my-loans' | 'digital-services' | 'trust' | 'account' | 'developer' | 'transactions' | 'settings' | 'help' | 'agent' | 'ai-lab';
+export type Section = 'home' | 'apply-loan' | 'my-loans' | 'digital-services' | 'trust' | 'account' | 'developer' | 'transactions' | 'settings' | 'help' | 'agent' | 'ai-lab' | 'tax';
 export type Role = 'user' | 'admin' | 'developer' | 'agent';
 
 export interface User {
@@ -122,6 +122,8 @@ export interface LoanRequest {
   tenure?: string; // e.g., "6 months"
   date: string;
   status: 'pending' | 'approved' | 'rejected';
+  interestRate?: number;
+  monthlyPayment?: number;
 }
 
 export interface LoanType {

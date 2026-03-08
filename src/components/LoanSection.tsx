@@ -34,9 +34,16 @@ const LoanSection: React.FC<LoanSectionProps> = ({ onBack, isRegistered, config 
   const [activeTab, setActiveTab] = useState<'apply' | 'my-loans'>('apply');
   const [showApplyForm, setShowApplyForm] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
   const [amount, setAmount] = useState('');
   const [tenure, setTenure] = useState('6 months');
+  
+  const interestRate = 0.10; // 10% flat rate
+  const loanAmount = parseFloat(amount) || 0;
+  const tenureMonths = parseInt(tenure.split(' ')[0]) || 1;
+  const totalRepayment = loanAmount * (1 + interestRate);
+  const monthlyPayment = totalRepayment / tenureMonths;
 
   const handleApply = (loan: any) => {
     if (loan.id === 'calculator') {
@@ -55,11 +62,13 @@ const LoanSection: React.FC<LoanSectionProps> = ({ onBack, isRegistered, config 
       id: Math.random().toString(36).substr(2, 9),
       userId: currentUser.id,
       userName: currentUser.name,
-      amount: parseFloat(amount),
+      amount: loanAmount,
       type: selectedLoan.label,
       tenure: tenure,
       date: new Date().toLocaleDateString(),
-      status: 'pending'
+      status: 'pending',
+      interestRate: interestRate * 100,
+      monthlyPayment: monthlyPayment
     };
 
     try {
@@ -102,6 +111,7 @@ const LoanSection: React.FC<LoanSectionProps> = ({ onBack, isRegistered, config 
 
     alert('Loan application submitted successfully!');
     setShowApplyForm(false);
+    setShowConfirmation(false);
     setAmount('');
     setActiveTab('my-loans');
   };
@@ -216,7 +226,7 @@ const LoanSection: React.FC<LoanSectionProps> = ({ onBack, isRegistered, config 
                   </select>
                 </div>
                 <button 
-                  onClick={submitLoan}
+                  onClick={() => setShowConfirmation(true)}
                   disabled={!amount || parseFloat(amount) <= 0}
                   className="w-full bg-green-700 disabled:bg-gray-300 hover:bg-green-800 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg shadow-green-700/20"
                 >
@@ -224,7 +234,27 @@ const LoanSection: React.FC<LoanSectionProps> = ({ onBack, isRegistered, config 
                   <CheckCircle2 className="w-5 h-5" />
                 </button>
               </div>
+              
+              {showConfirmation && (
+                <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+                    <h3 className="text-xl font-bold">Confirm Application</h3>
+                    <div className="space-y-2 text-sm">
+                      <p className="flex justify-between"><span className="text-[#666]">Loan Type:</span> <span className="font-bold">{selectedLoan?.label}</span></p>
+                      <p className="flex justify-between"><span className="text-[#666]">Amount:</span> <span className="font-bold">K {loanAmount.toLocaleString()}</span></p>
+                      <p className="flex justify-between"><span className="text-[#666]">Tenure:</span> <span className="font-bold">{tenure}</span></p>
+                      <p className="flex justify-between"><span className="text-[#666]">Interest Rate:</span> <span className="font-bold">{(interestRate * 100).toFixed(0)}%</span></p>
+                      <p className="flex justify-between"><span className="text-[#666]">Monthly Payment:</span> <span className="font-bold">K {monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
+                    </div>
+                    <div className="flex gap-4">
+                      <button onClick={() => setShowConfirmation(false)} className="flex-1 py-3 bg-[#F0F0F0] rounded-xl font-bold text-sm">Cancel</button>
+                      <button onClick={submitLoan} className="flex-1 py-3 bg-green-700 text-white rounded-xl font-bold text-sm">Confirm</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+            
           ) : (
             applyButtons.map((btn) => (
               <button

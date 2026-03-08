@@ -15,7 +15,8 @@ import {
   UserPlus,
   FileText,
   Save,
-  Video
+  Video,
+  ArrowLeft
 } from 'lucide-react';
 import { User, ChatMessage, Agent, SystemConfig, Task } from '../types';
 import SupportChat from './SupportChat';
@@ -26,9 +27,10 @@ interface AgentPanelProps {
   onLogout: () => void;
   agentId: string;
   isDeveloper?: boolean;
+  onBack?: () => void;
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper, onBack }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'tasks' | 'meeting' | 'storage'>('users');
@@ -71,7 +73,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
     const fetchData = async () => {
       try {
         const [usersRes, agentsRes, configRes] = await Promise.all([
-          fetch('/api/users'),
+          fetch(`/api/users`),
           fetch('/api/agents'),
           fetch('/api/system-config')
         ]);
@@ -200,6 +202,10 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
   };
 
   const handleDeleteUser = async (id: string) => {
+    if (id === agentId) {
+      alert('You cannot delete your own agent profile.');
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
         await fetch(`/api/users/${id}`, { method: 'DELETE' });
@@ -235,13 +241,24 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
               </p>
             </div>
           </div>
-          <button 
-            onClick={onLogout}
-            className="px-6 py-3 bg-red-50 text-red-600 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-            LOGOUT
-          </button>
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button 
+                onClick={onBack}
+                className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                BACK_TO_APP
+              </button>
+            )}
+            <button 
+              onClick={onLogout}
+              className="px-6 py-3 bg-red-50 text-red-600 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              LOGOUT
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -738,7 +755,6 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onLogout, agentId, isDeveloper 
         </AnimatePresence>
 
         <SupportChat currentUser={null} role="agent" config={config} />
-        <ZoomControl />
       </div>
     </div>
   );

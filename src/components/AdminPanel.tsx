@@ -66,11 +66,12 @@ import ZoomControl from './ZoomControl';
 interface AdminPanelProps {
   onLogout: () => void;
   isDeveloper?: boolean;
+  onBack?: () => void;
 }
 
 import { sendPushNotification } from '../utils/notifications';
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper, onBack }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(isDeveloper || false);
   const [adminUser, setAdminUser] = useState('');
   const [password, setPassword] = useState('');
@@ -80,7 +81,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [streamingApps, setStreamingApps] = useState<StreamingApp[]>([]);
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'services' | 'system' | 'workplace' | 'storage' | 'chat' | 'agents' | 'meetings' | 'streaming' | 'app-request' | 'live-meeting' | 'transactions' | 'approved-apps'>('workplace');
+  const [agentRequests, setAgentRequests] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'services' | 'system' | 'workplace' | 'storage' | 'chat' | 'agents' | 'meetings' | 'streaming' | 'live-meeting' | 'transactions' | 'agent-requests'>('workplace');
   const [searchTerm, setSearchTerm] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
@@ -119,12 +121,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
 
   const createFolder = (name: string) => {
     const newFolder = { id: Math.random().toString(36).substr(2, 9), name, parentId: currentFolderId };
-    setFolders([...folders, newFolder]);
+    const updatedFolders = [...folders, newFolder];
+    setFolders(updatedFolders);
+    localStorage.setItem('moneylink_admin_folders', JSON.stringify(updatedFolders));
   };
 
   const deleteFolder = (id: string) => {
-    setFolders(folders.filter(f => f.id !== id));
-    setFiles(files.filter(f => f.folderId !== id));
+    const updatedFolders = folders.filter(f => f.id !== id);
+    setFolders(updatedFolders);
+    localStorage.setItem('moneylink_admin_folders', JSON.stringify(updatedFolders));
+    
+    const updatedFiles = files.filter(f => f.folderId !== id);
+    setFiles(updatedFiles);
+    localStorage.setItem('moneylink_admin_files', JSON.stringify(updatedFiles));
   };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txFilterType, setTxFilterType] = useState<string>('all');
@@ -244,8 +253,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
     if (isLoggedIn) {
       const loadData = async () => {
         try {
-          // Fetch from backend with adminId filter
-          const adminIdParam = currentAdminId ? `?adminId=${currentAdminId}` : '';
+          // Fetch from backend - Main Admin sees everything
+          // const adminIdParam = currentAdminId === 'main-admin' ? '' : (currentAdminId ? `?adminId=${currentAdminId}` : '');
+          const adminIdParam = ''; // Give full access to all admins
           
           const fetchWithFallback = async (url: string, fallback: any = []) => {
             try {
@@ -261,7 +271,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
           const [
             backendUsers, backendAgents, backendMeetings, backendStreaming, 
             allRequests, backendConfig, backendTransactions, backendLoanRequests,
-            backendChatMessages, backendAdminNotifications, backendRecurringPayments
+            backendChatMessages, backendAdminNotifications, backendRecurringPayments,
+            backendAgentRequests
           ] = await Promise.all([
             fetchWithFallback(`/api/users${adminIdParam}`),
             fetchWithFallback(`/api/agents${adminIdParam}`),
@@ -273,19 +284,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
             fetchWithFallback(`/api/loan-requests${adminIdParam}`),
             fetchWithFallback(`/api/chat-messages${adminIdParam}`),
             fetchWithFallback('/api/admin-notifications'),
-            fetchWithFallback('/api/recurring-payments')
+            fetchWithFallback('/api/recurring-payments'),
+            fetchWithFallback('/api/agent-requests')
           ]);
           
           setUsers(backendUsers);
           setAgents(backendAgents);
           setMeetings(backendMeetings);
           setStreamingApps(backendStreaming);
-          setMyAppRequests(allRequests.filter((r: any) => r.adminId === currentAdminId));
+          setMyAppRequests(currentAdminId === 'main-admin' ? allRequests : allRequests.filter((r: any) => r.adminId === currentAdminId));
           setTransactions(backendTransactions);
           setLoanRequests(backendLoanRequests);
           setChatMessages(backendChatMessages);
           setAdminNotifications(backendAdminNotifications);
           setRecurringPayments(backendRecurringPayments);
+          setAgentRequests(backendAgentRequests);
           
           if (backendConfig && Object.keys(backendConfig).length > 0) {
             setConfig(prev => ({ ...prev, ...backendConfig }));
@@ -308,26 +321,59 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   }, [isLoggedIn, currentAdminId]);
 
   const handleLogin = async () => {
-    try {
-      const res = await fetch('/api/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: adminUser, password: password })
+    // 1. Check Hardcoded Main Admin
+    if (adminUser === '709580' && password === '709580') {
+      setIsLoggedIn(true);
+      setCurrentAdminId('main-admin');
+      setCurrentAdmin({
+        id: 'main-admin',
+        username: '709580',
+        companyName: 'DERICK MUSIYALIKE INSTITUTION (DMI)',
+        isMainAdmin: true,
+        isApproved: true,
+        createdAt: new Date().toISOString(),
+        status: 'active'
       });
-      
-      const data = await res.json();
-      
-      if (data.success) {
-        setIsLoggedIn(true);
-        setCurrentAdminId(data.admin.id);
-        setCurrentAdmin(data.admin);
-        setError('');
-      } else {
-        setError(data.message || 'Invalid Admin Credentials');
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.');
+      setError('');
+      return;
     }
+
+    // 2. Check Created Admins (from API or LocalStorage)
+    try {
+      let adminsList: Admin[] = [];
+      
+      // Try API first
+      try {
+        const res = await fetch('/api/admins');
+        if (res.ok) {
+          adminsList = await res.json();
+        }
+      } catch (e) {
+        console.warn('Failed to fetch admins from API, checking local storage');
+      }
+
+      // Fallback to local storage
+      if (adminsList.length === 0) {
+        const storedAdmins = localStorage.getItem('moneylink_admins');
+        if (storedAdmins) {
+          adminsList = JSON.parse(storedAdmins);
+        }
+      }
+
+      const matchedAdmin = adminsList.find(a => a.username === adminUser && a.password === password);
+      
+      if (matchedAdmin) {
+        setIsLoggedIn(true);
+        setCurrentAdminId(matchedAdmin.id);
+        setCurrentAdmin({ ...matchedAdmin, isApproved: true, isMainAdmin: true }); // Grant full access
+        setError('');
+        return;
+      }
+    } catch (e) {
+      console.error('Admin login check failed:', e);
+    }
+    
+    setError('Invalid Admin Credentials. Only authorized admins can access this panel.');
   };
 
   const submitAppRequest = async () => {
@@ -381,6 +427,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       body: JSON.stringify(newAgent)
     });
     
+    // Create Admin Storage Folder for Agent
+    const storedFolders = JSON.parse(localStorage.getItem('moneylink_admin_folders') || '[]');
+    const folderId = Math.random().toString(36).substr(2, 9);
+    storedFolders.push({
+      id: folderId,
+      name: `Agent: ${newAgent.name}`,
+      parentId: null
+    });
+    localStorage.setItem('moneylink_admin_folders', JSON.stringify(storedFolders));
+
     setAgents(prev => [newAgent, ...prev]);
     alert('Agent recruited successfully!');
   };
@@ -410,6 +466,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       body: JSON.stringify(newUser)
     });
     
+    // Create Admin Storage Folder for User
+    const storedFolders = JSON.parse(localStorage.getItem('moneylink_admin_folders') || '[]');
+    const folderId = Math.random().toString(36).substr(2, 9);
+    storedFolders.push({
+      id: folderId,
+      name: `User: ${newUser.name} (${newUser.phone})`,
+      parentId: null
+    });
+    localStorage.setItem('moneylink_admin_folders', JSON.stringify(storedFolders));
+
     setUsers(prev => [newUser, ...prev]);
     alert('User added successfully!');
   };
@@ -503,27 +569,82 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
       doc.text(`NRC Number: ${user.nrc}`, 14, y); y += 7;
       doc.text(`Current Balance: K ${user.balance || 0}`, 14, y); y += 7;
       doc.text(`Verification Status: ${user.isVerified ? 'VERIFIED' : 'PENDING'}`, 14, y); y += 7;
-      doc.text(`Account Status: ${user.isFrozen ? 'FROZEN' : 'ACTIVE'}`, 14, y); y += 10;
+      doc.text(`Account Status: ${user.isFrozen ? 'FROZEN' : 'ACTIVE'}`, 14, y); y += 15;
       
-      doc.setFontSize(12);
-      doc.text('Uploaded Documents Metadata:', 14, y); y += 7;
-      doc.setFontSize(9);
-      doc.text(`- NRC Front: ${user.nrcFront ? 'UPLOADED (Base64 Data Present)' : 'NOT UPLOADED'}`, 14, y); y += 5;
-      doc.text(`- NRC Back: ${user.nrcBack ? 'UPLOADED (Base64 Data Present)' : 'NOT UPLOADED'}`, 14, y); y += 5;
-      doc.text(`- Selfie Photo: ${user.selfiePhoto ? 'UPLOADED (Base64 Data Present)' : 'NOT UPLOADED'}`, 14, y); y += 5;
-      doc.text(`- Passport Photo: ${user.passportPhoto ? 'UPLOADED (Base64 Data Present)' : 'NOT UPLOADED'}`, 14, y); y += 10;
+      doc.setFontSize(14);
+      doc.text('Identity Documents', 14, y); y += 10;
       
-      doc.setFontSize(8);
-      doc.text('Note: High-resolution images are stored in the secure cloud storage and can be viewed in the Admin Panel.', 14, y);
+      const imgWidth = 80;
+      const imgHeight = 50;
+      let imgY = y;
+      
+      // Row 1: NRC Front & Back
+      if (user.nrcFront) {
+        doc.setFontSize(10);
+        doc.text('NRC Front View:', 14, imgY);
+        try {
+          doc.addImage(user.nrcFront, 'JPEG', 14, imgY + 5, imgWidth, imgHeight);
+        } catch (e) {
+          doc.setTextColor(255, 0, 0);
+          doc.text('Image Load Error', 14, imgY + 20);
+          doc.setTextColor(0, 0, 0);
+        }
+      } else {
+        doc.text('NRC Front: Not Uploaded', 14, imgY);
+      }
+
+      if (user.nrcBack) {
+        doc.text('NRC Back View:', 110, imgY);
+        try {
+          doc.addImage(user.nrcBack, 'JPEG', 110, imgY + 5, imgWidth, imgHeight);
+        } catch (e) {
+          doc.setTextColor(255, 0, 0);
+          doc.text('Image Load Error', 110, imgY + 20);
+          doc.setTextColor(0, 0, 0);
+        }
+      } else {
+        doc.text('NRC Back: Not Uploaded', 110, imgY);
+      }
+
+      imgY += 70; // Move to next row
+
+      // Row 2: Selfie & Passport
+      if (user.selfiePhoto) {
+        doc.text('Selfie Verification:', 14, imgY);
+        try {
+          doc.addImage(user.selfiePhoto, 'JPEG', 14, imgY + 5, imgWidth, imgHeight);
+        } catch (e) {
+          doc.setTextColor(255, 0, 0);
+          doc.text('Image Load Error', 14, imgY + 20);
+          doc.setTextColor(0, 0, 0);
+        }
+      } else {
+        doc.text('Selfie: Not Uploaded', 14, imgY);
+      }
+
+      if (user.passportPhoto) {
+        doc.text('Passport Photo:', 110, imgY);
+        try {
+          doc.addImage(user.passportPhoto, 'JPEG', 110, imgY + 5, imgWidth, imgHeight);
+        } catch (e) {
+          doc.setTextColor(255, 0, 0);
+          doc.text('Image Load Error', 110, imgY + 20);
+          doc.setTextColor(0, 0, 0);
+        }
+      } else {
+        doc.text('Passport Photo: Not Uploaded', 110, imgY);
+      }
     });
 
     doc.save(`moneylink_master_database_${new Date().getTime()}.pdf`);
-    alert('Master User Database PDF generated successfully!');
+    alert('Master User Database PDF generated successfully! All images included.');
   };
 
   useEffect(() => {
     const storedFiles = JSON.parse(localStorage.getItem('moneylink_admin_files') || '[]');
     setFiles(storedFiles);
+    const storedFolders = JSON.parse(localStorage.getItem('moneylink_admin_folders') || '[]');
+    setFolders(storedFolders);
   }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,12 +702,69 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
     
     doc.text('System ID: ' + user.id, 14, 95);
     
-    // Note: Images in PDF are complex with base64, but we can add placeholders or try to embed if they are base64
-    doc.text('Documents on File:', 14, 110);
-    doc.text('- NRC Front Copy: [ATTACHED IN SYSTEM]', 14, 117);
-    doc.text('- NRC Back Copy: [ATTACHED IN SYSTEM]', 14, 124);
-    doc.text('- Selfie Verification: [ATTACHED IN SYSTEM]', 14, 131);
-    doc.text('- Passport Photo: [ATTACHED IN SYSTEM]', 14, 138);
+    doc.setFontSize(14);
+    doc.text('Identity Documents', 14, 110);
+    
+    const imgWidth = 80;
+    const imgHeight = 50;
+    let imgY = 120;
+    
+    // Row 1: NRC Front & Back
+    if (user.nrcFront) {
+      doc.setFontSize(10);
+      doc.text('NRC Front View:', 14, imgY);
+      try {
+        doc.addImage(user.nrcFront, 'JPEG', 14, imgY + 5, imgWidth, imgHeight);
+      } catch (e) {
+        doc.setTextColor(255, 0, 0);
+        doc.text('Image Load Error', 14, imgY + 20);
+        doc.setTextColor(0, 0, 0);
+      }
+    } else {
+      doc.text('NRC Front: Not Uploaded', 14, imgY);
+    }
+
+    if (user.nrcBack) {
+      doc.text('NRC Back View:', 110, imgY);
+      try {
+        doc.addImage(user.nrcBack, 'JPEG', 110, imgY + 5, imgWidth, imgHeight);
+      } catch (e) {
+        doc.setTextColor(255, 0, 0);
+        doc.text('Image Load Error', 110, imgY + 20);
+        doc.setTextColor(0, 0, 0);
+      }
+    } else {
+      doc.text('NRC Back: Not Uploaded', 110, imgY);
+    }
+
+    imgY += 70; // Move to next row
+
+    // Row 2: Selfie & Passport
+    if (user.selfiePhoto) {
+      doc.text('Selfie Verification:', 14, imgY);
+      try {
+        doc.addImage(user.selfiePhoto, 'JPEG', 14, imgY + 5, imgWidth, imgHeight);
+      } catch (e) {
+        doc.setTextColor(255, 0, 0);
+        doc.text('Image Load Error', 14, imgY + 20);
+        doc.setTextColor(0, 0, 0);
+      }
+    } else {
+      doc.text('Selfie: Not Uploaded', 14, imgY);
+    }
+
+    if (user.passportPhoto) {
+      doc.text('Passport Photo:', 110, imgY);
+      try {
+        doc.addImage(user.passportPhoto, 'JPEG', 110, imgY + 5, imgWidth, imgHeight);
+      } catch (e) {
+        doc.setTextColor(255, 0, 0);
+        doc.text('Image Load Error', 110, imgY + 20);
+        doc.setTextColor(0, 0, 0);
+      }
+    } else {
+      doc.text('Passport Photo: Not Uploaded', 110, imgY);
+    }
     
     doc.setFontSize(8);
     doc.text(`${config.appName} Banking System - Confidential Document`, 14, 280);
@@ -627,6 +805,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   const handleApprove = async (requestId: string) => {
     const request = loanRequests.find(r => r.id === requestId);
     if (!request) return;
+
+    if (currentAdminId === 'main-admin') {
+      // Direct approval logic for main admin
+      try {
+        const updatedRequest = { ...request, status: 'approved' as const };
+        await fetch(`/api/loan-requests/${requestId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedRequest)
+        });
+        
+        const updatedRequests = loanRequests.map(req => 
+          req.id === requestId ? updatedRequest : req
+        );
+        setLoanRequests(updatedRequests);
+
+        const userToUpdate = users.find(u => u.id === request.userId);
+        if (userToUpdate) {
+          const updatedUser = { ...userToUpdate, balance: (userToUpdate.balance || 0) + request.amount };
+          await fetch(`/api/users/${request.userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedUser)
+          });
+          setUsers(users.map(u => u.id === request.userId ? updatedUser : u));
+        }
+        
+        downloadLoanApproval(request);
+        alert(`Loan of K ${request.amount} approved for ${request.userName} (Main Admin Override).`);
+      } catch (error) {
+        console.error('Failed to approve loan via API', error);
+        alert('Failed to approve loan. Please try again.');
+      }
+      return;
+    }
 
     try {
       // Update Request Status via API
@@ -759,6 +972,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   };
 
   const handleReject = async (requestId: string) => {
+    if (currentAdminId === 'main-admin') {
+      const request = loanRequests.find(r => r.id === requestId);
+      if (!request) return;
+      
+      const updatedRequest = { ...request, status: 'rejected' as const };
+      const updatedRequests = loanRequests.map(req => 
+        req.id === requestId ? updatedRequest : req
+      );
+      setLoanRequests(updatedRequests);
+      alert(`Loan request ${requestId} has been rejected (Main Admin Override).`);
+      return;
+    }
+
     try {
       const request = loanRequests.find(r => r.id === requestId);
       if (!request) return;
@@ -786,6 +1012,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (userId === currentAdminId) {
+      alert('You cannot delete your own admin profile.');
+      return;
+    }
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await fetch(`/api/users/${userId}`, { method: 'DELETE' });
@@ -913,7 +1143,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
             </div>
             <div>
               <h1 className="text-2xl font-bold">
-                {currentAdmin?.isMainAdmin ? 'DERICK MUSIYALIKE INSTITUTION' : currentAdmin?.companyName || 'Admin Dashboard'}
+                {currentAdmin?.isMainAdmin ? 'DERICK MUSIYALIKE INSTITUTION (DMI)' : currentAdmin?.companyName || 'Admin Dashboard'}
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-2 h-2 rounded-full ${isConnectionActive ? 'bg-green-500 animate-ping' : 'bg-green-500'}`}></div>
@@ -1023,20 +1253,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
             Streaming
           </button>
           <button
-            onClick={() => setActiveTab('app-request')}
-            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'app-request' ? 'bg-white shadow-sm text-green-700' : 'text-[#666]'
+            onClick={() => setActiveTab('agent-requests')}
+            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${
+              activeTab === 'agent-requests' ? 'bg-white shadow-sm text-green-700' : 'text-[#666]'
             }`}>
-            <Globe className="w-4 h-4" />
-            App Request
-          </button>
-          <button
-            onClick={() => setActiveTab('approved-apps')}
-            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'approved-apps' ? 'bg-white shadow-sm text-green-700' : 'text-[#666]'
-            }`}>
-            <CheckCircle className="w-4 h-4" />
-            Approved Apps
+            <Users className="w-4 h-4" />
+            Agent Requests
+            {agentRequests.filter(r => r.status === 'pending').length > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full border-2 border-white animate-pulse"></span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('transactions')}
@@ -1135,23 +1360,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                         <p className="text-[10px] text-[#999]">Tax ID: {agent.taxId}</p>
                         <p className="text-[10px] text-green-700 font-bold mt-1">STATUS: {agent.status.toUpperCase()}</p>
                       </div>
-                      <button 
-                        onClick={async () => {
-                          const newPhone = prompt('Edit Agent Phone:', agent.phone);
-                          if (newPhone) {
-                            const updatedAgent = { ...agent, phone: newPhone };
-                            await fetch(`/api/agents/${agent.id}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(updatedAgent)
-                            });
-                            setAgents(prev => prev.map(a => a.id === agent.id ? updatedAgent : a));
-                          }
-                        }}
-                        className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            localStorage.setItem('moneylink_agent_direct_login', 'true');
+                            localStorage.setItem('moneylink_current_agent_id', agent.id);
+                            window.location.href = `/?mode=agent&id=${agent.id}`;
+                          }}
+                          className="p-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all"
+                          title="Login as Agent"
+                        >
+                          <LogOut className="w-4 h-4 rotate-180" />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            const newPhone = prompt('Edit Agent Phone:', agent.phone);
+                            if (newPhone) {
+                              const updatedAgent = { ...agent, phone: newPhone };
+                              await fetch(`/api/agents/${agent.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(updatedAgent)
+                              });
+                              setAgents(prev => prev.map(a => a.id === agent.id ? updatedAgent : a));
+                            }
+                          }}
+                          className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1233,106 +1471,75 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                   )}
                 </div>
               </div>
-            ) : activeTab === 'app-request' ? (
-              <div className="max-w-md mx-auto space-y-8 py-8">
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
-                    <Globe className="w-8 h-8" />
-                  </div>
-                  <h2 className="text-xl font-bold">Request New App Name</h2>
-                  <p className="text-sm text-[#666]">Admins can request a custom app name. Once approved by the developer, your workplace will be updated.</p>
+            ) : activeTab === 'agent-requests' ? (
+              <div className="space-y-6 p-6">
+                <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-4">
+                  <h2 className="text-xl font-bold">Agent Requests</h2>
+                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-md">
+                    {agentRequests.filter(r => r.status === 'pending').length} PENDING
+                  </span>
                 </div>
-                
-                {myAppRequests.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold text-[#999] uppercase tracking-widest">Your Requests</h3>
-                    {myAppRequests.map(req => (
-                      <div key={req.id} className="p-4 bg-white border border-[#E5E5E5] rounded-2xl flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-sm">{req.requestedName}</p>
-                          <p className="text-[10px] text-[#999]">{new Date(req.createdAt).toLocaleDateString()}</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded-full text-[8px] font-bold uppercase ${
-                          req.status === 'approved' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {req.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 <div className="space-y-4">
-                  <input 
-                    type="text" 
-                    placeholder="Enter Requested App Name (Company Name)" 
-                    value={requestedAppName}
-                    onChange={(e) => setRequestedAppName(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-bold outline-none focus:border-blue-600"
-                  />
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => setAppIcon(ev.target?.result as string);
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="w-full p-3 bg-white/5 rounded-xl border border-white/10"
-                  />
-                  {appIcon && <img src={appIcon} alt="Preview" className="w-20 h-20 rounded-lg" />}
-                  <input 
-                    type="text" 
-                    placeholder="Create Your Admin Username" 
-                    value={desiredUsername}
-                    onChange={(e) => setDesiredUsername(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-bold outline-none focus:border-blue-600"
-                  />
-                  <input 
-                    type="password" 
-                    placeholder="Create Your Admin Password" 
-                    value={desiredPassword}
-                    onChange={(e) => setDesiredPassword(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-bold outline-none focus:border-blue-600"
-                  />
-                  <button 
-                    onClick={submitAppRequest}
-                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
-                  >
-                    SUBMIT_REQUEST
-                  </button>
-                </div>
-              </div>
-            ) : activeTab === 'approved-apps' ? (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Approved Apps</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {myAppRequests.filter(r => r.status === 'approved').map(app => (
-                    <div key={app.id} className="p-6 bg-white border border-[#E5E5E5] rounded-2xl shadow-sm flex flex-col justify-between">
+                  {agentRequests.filter(r => r.status === 'pending').map(req => (
+                    <div key={req.id} className="p-6 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl flex items-center justify-between">
                       <div>
-                        <div className="w-16 h-16 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mb-4 overflow-hidden">
-                          {app.appIcon ? <img src={app.appIcon} alt="App Icon" className="w-full h-full object-cover" /> : <Globe className="w-8 h-8" />}
-                        </div>
-                        <p className="font-bold text-sm">{app.requestedName}</p>
-                        <p className="text-[10px] text-[#999]">Status: Approved</p>
+                        <p className="font-bold text-sm">{req.name}</p>
+                        <p className="text-[10px] text-[#999]">{req.email} | {req.phone}</p>
+                        <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase">Status: {req.status}</p>
                       </div>
-                      {app.downloadUrl && (
-                        <a 
-                          href={app.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 w-full py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={async () => {
+                            await fetch(`/api/agent-requests/${req.id}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'approved' })
+                            });
+                            
+                            const newAgent: Agent = {
+                              id: Date.now().toString(),
+                              adminId: currentAdminId || 'unknown',
+                              name: req.name,
+                              phone: req.phone,
+                              status: 'active',
+                              taxId: `TAX_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                              joinedAt: new Date().toISOString()
+                            };
+                            
+                            await fetch('/api/agents', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(newAgent)
+                            });
+                            
+                            setAgents([...agents, newAgent]);
+                            setAgentRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
+                            alert('Agent Approved!');
+                          }}
+                          className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all"
                         >
-                          <Download className="w-4 h-4" /> Download APK
-                        </a>
-                      )}
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            await fetch(`/api/agent-requests/${req.id}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'rejected' })
+                            });
+                            setAgentRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'rejected' } : r));
+                          }}
+                          className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  {myAppRequests.filter(r => r.status === 'approved').length === 0 && (
-                    <p className="text-sm text-[#999]">No approved apps yet.</p>
+                  {agentRequests.filter(r => r.status === 'pending').length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-[#999] text-sm italic">No pending agent requests.</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1462,7 +1669,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                 </div>
               </div>
             ) : activeTab === 'requests' ? (
-              <table className="w-full text-left">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
                 <thead>
                   <tr className="bg-[#F8F9FA] text-[#999] text-[10px] uppercase font-bold tracking-widest">
                     <th className="px-6 py-4">User</th>
@@ -1523,8 +1731,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : activeTab === 'users' ? (
-              <table className="w-full text-left">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
                 <thead>
                   <tr className="bg-[#F8F9FA] text-[#999] text-[10px] uppercase font-bold tracking-widest">
                     <th className="px-6 py-4">User Details</th>
@@ -1623,6 +1833,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : activeTab === 'system' ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -2278,7 +2489,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, isDeveloper }) => {
           )}
         </AnimatePresence>
         <SupportChat currentUser={null} role="admin" config={config} />
-        <ZoomControl />
       </div>
     </div>
   );

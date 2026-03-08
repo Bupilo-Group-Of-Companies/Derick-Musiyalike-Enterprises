@@ -22,16 +22,68 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    // Admin Login Check
+    // 1. Check Hardcoded Admin
     if (phone === '709580' && password === '709580') {
       onAdminLogin();
       return;
     }
 
+    // 2. Check Created Admins (from API or LocalStorage)
     try {
-      const response = await fetch('/api/users');
-      const users: User[] = await response.json();
-      const user = users.find(u => u.phone === phone && u.password === password);
+      let admins: any[] = [];
+      try {
+        const res = await fetch('/api/admins');
+        if (res.ok) {
+          admins = await res.json();
+        }
+      } catch (e) {
+        console.warn('Failed to fetch admins from API, checking local storage');
+      }
+
+      // Fallback to local storage for admins if API failed or returned empty
+      if (admins.length === 0) {
+        const storedAdmins = localStorage.getItem('moneylink_admins');
+        if (storedAdmins) {
+          admins = JSON.parse(storedAdmins);
+        }
+      }
+
+      const adminUser = admins.find(a => a.username === phone && a.password === password);
+      if (adminUser) {
+        onAdminLogin();
+        return;
+      }
+    } catch (e) {
+      console.error('Admin check failed:', e);
+    }
+
+    // 3. Check Regular Users
+    try {
+      let apiUsers: User[] = [];
+      let localUsers: User[] = [];
+
+      // Fetch from API
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          apiUsers = await response.json();
+        }
+      } catch (error) {
+        console.warn('API login check failed, relying on local storage');
+      }
+
+      // Fetch from Local Storage
+      const storedUsers = localStorage.getItem('moneylink_users');
+      if (storedUsers) {
+        localUsers = JSON.parse(storedUsers);
+      }
+
+      // Merge users (prefer API data if duplicate ID, but since we use random IDs, phone is better check)
+      // Actually, we just need to find *any* matching user.
+      const allUsers = [...apiUsers, ...localUsers];
+      
+      // Find user in combined list
+      const user = allUsers.find(u => u.phone === phone && u.password === password);
 
       if (user) {
         onLogin(user);
@@ -156,7 +208,10 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
                     <input 
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                      onChange={(e) => {
+                        setPhone(e.target.value.replace(/\D/g, ''));
+                        setError('');
+                      }}
                       className="w-full pl-16 pr-4 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-bold focus:outline-none focus:border-green-700 transition-colors"
                       placeholder="971234567"
                     />
@@ -169,7 +224,10 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
                     <input 
                       type={showPassword ? 'text' : 'password'}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError('');
+                      }}
                       className="w-full pl-16 pr-12 py-4 bg-[#F8F9FA] border border-[#E5E5E5] rounded-2xl text-lg font-medium focus:outline-none focus:border-green-700 transition-colors"
                       placeholder="Password"
                     />
@@ -255,7 +313,7 @@ const LoginFlow: React.FC<LoginFlowProps> = ({ onLogin, onAdminLogin, onCancel, 
                   </p>
                   {generatedOtp && (
                     <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
-                      Test OTP: {generatedOtp}
+                      OTP: {generatedOtp}
                     </div>
                   )}
                 </div>

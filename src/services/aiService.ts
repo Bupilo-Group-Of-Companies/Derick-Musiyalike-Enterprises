@@ -49,6 +49,19 @@ export const generateThinkingResponse = async (prompt: string) => {
   return response.text;
 };
 
+export const generateLabResponse = async (prompt: string, model: string, config: { temperature: number, topP: number }) => {
+  const ai = getAI();
+  const response = await ai.models.generateContent({
+    model: model || "gemini-3.1-pro-preview",
+    contents: prompt,
+    config: {
+      temperature: config.temperature,
+      topP: config.topP,
+    }
+  });
+  return response.text;
+};
+
 export const generateSpeech = async (text: string, voice: 'Kore' | 'Puck' | 'Charon' | 'Fenrir' | 'Zephyr' = 'Kore') => {
   const ai = getAI();
   const response = await ai.models.generateContent({

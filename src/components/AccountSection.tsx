@@ -28,13 +28,46 @@ interface AccountSectionProps {
 
 const AccountSection: React.FC<AccountSectionProps> = ({ onBack, onLogout, currentUser, onNavigate, config }) => {
   const [activeSubPanel, setActiveSubPanel] = useState<'main' | 'payment' | 'address' | 'security'>('main');
-  const [profile] = useState({
-    name: currentUser?.name || 'Guest',
-    email: currentUser?.phone || 'No phone'
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: currentUser?.name || '',
+    email: currentUser?.phone || '', // Using phone as email placeholder for now based on original code
+    phone: currentUser?.phone || ''
   });
 
+  const handleSaveProfile = () => {
+    // Simulate API call
+    setTimeout(() => {
+      // Update local storage
+      const storedUsers = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
+      const updatedUsers = storedUsers.map((u: any) => {
+        if (u.id === currentUser?.id) {
+          return { ...u, name: editForm.name, phone: editForm.phone };
+        }
+        return u;
+      });
+      localStorage.setItem('moneylink_users', JSON.stringify(updatedUsers));
+      
+      // Update current user session
+      if (currentUser) {
+        const updatedUser = { ...currentUser, name: editForm.name, phone: editForm.phone };
+        localStorage.setItem('moneylink_current_user', JSON.stringify(updatedUser));
+        // Force a reload to reflect changes or use a callback if available (but for now reload is safest to sync state)
+        window.location.reload();
+      }
+      
+      setIsEditing(false);
+      alert('Profile updated successfully!');
+    }, 1000);
+  };
+
   const menuItems = [
-    { id: 'profile', label: 'Personal Information', icon: UserIcon, onClick: () => alert('Profile editing is restricted. Contact support to update details.') },
+    { 
+      id: 'profile', 
+      label: 'Personal Information', 
+      icon: UserIcon, 
+      onClick: () => setIsEditing(true) 
+    },
     { id: 'payment', label: 'Payment Methods', icon: CreditCard, onClick: () => setActiveSubPanel('payment') },
     { id: 'address', label: 'Saved Addresses', icon: MapPin, onClick: () => setActiveSubPanel('address') },
     { id: 'notifications', label: 'Notification Settings', icon: Bell },
@@ -42,6 +75,30 @@ const AccountSection: React.FC<AccountSectionProps> = ({ onBack, onLogout, curre
     { id: 'security-settings', label: 'Security Settings', icon: ShieldCheck },
     { id: 'referral', label: 'Referral Program', icon: Users, onClick: () => alert('Referral Code: ML' + currentUser?.id?.toUpperCase()) },
     { id: 'preferences', label: 'App Preferences', icon: Settings },
+    { 
+      id: 'delete-account', 
+      label: 'Delete Account', 
+      icon: CloseIcon, 
+      onClick: async () => {
+        if (confirm('Are you sure you want to permanently delete your account? This action cannot be undone.')) {
+          try {
+            if (currentUser?.id) {
+              await fetch(`/api/users/${currentUser.id}`, { method: 'DELETE' });
+              // Also remove from local storage users list if it exists
+              const storedUsers = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
+              const updatedUsers = storedUsers.filter((u: any) => u.id !== currentUser.id);
+              localStorage.setItem('moneylink_users', JSON.stringify(updatedUsers));
+              
+              alert('Your account has been deleted successfully.');
+              onLogout();
+            }
+          } catch (error) {
+            console.error('Failed to delete account:', error);
+            alert('Failed to delete account. Please try again later.');
+          }
+        }
+      } 
+    },
   ];
 
   if (activeSubPanel === 'address') {
@@ -215,8 +272,8 @@ const AccountSection: React.FC<AccountSectionProps> = ({ onBack, onLogout, curre
           </div>
         </div>
 
-        <h2 className="text-xl font-bold">{profile.name}</h2>
-        <p className="text-xs text-[#999] font-medium">+260 {profile.email}</p>
+        <h2 className="text-xl font-bold">{currentUser?.name || 'Guest'}</h2>
+        <p className="text-xs text-[#999] font-medium">+260 {currentUser?.phone}</p>
         <p className="text-[10px] text-[#999] font-bold mt-1">NRC: {currentUser?.nrc}</p>
         <div className="mt-4 flex flex-col items-center gap-2">
           <div className="px-4 py-1.5 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
@@ -236,6 +293,56 @@ const AccountSection: React.FC<AccountSectionProps> = ({ onBack, onLogout, curre
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2rem] p-6 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Edit Profile</h3>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Name</label>
+                <input 
+                  type="text" 
+                  value={editForm.name}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-green-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone Number</label>
+                <input 
+                  type="text" 
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-green-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button 
+                onClick={() => setIsEditing(false)}
+                className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveProfile}
+                className="flex-1 py-3 bg-green-700 text-white rounded-xl font-bold hover:bg-green-800 transition-colors shadow-lg shadow-green-700/20"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {currentUser?.nrcFront && (
         <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm">

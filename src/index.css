@@ -14,7 +14,8 @@ body {
   @apply bg-[#F8F9FA] text-[#1A1A1A];
 }
 
-/* Custom scrollbar for a cleaner look */
+/* Custom scrollbar removed to restore native behavior for better accessibility and touch support */
+/* 
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -31,6 +32,7 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #D1D1D1;
 }
+*/
 
 @layer base {
   button {

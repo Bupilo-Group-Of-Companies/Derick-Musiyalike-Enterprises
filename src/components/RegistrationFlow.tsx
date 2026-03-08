@@ -21,12 +21,13 @@ import { User as UserType } from '../types';
 interface RegistrationFlowProps {
   onComplete: (user: UserType) => void;
   onCancel: () => void;
+  onSwitchToLogin?: () => void;
   appConfig: { name: string, logo: string };
 }
 
 type Step = 'phone' | 'otp' | 'password' | 'nrc' | 'passport' | 'selfie' | 'success';
 
-const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCancel, appConfig }) => {
+const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCancel, onSwitchToLogin, appConfig }) => {
   const [step, setStep] = useState<Step>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -87,24 +88,21 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
     if (phoneNumber.length >= 9) {
       try {
         const res = await fetch('/api/users');
-        if (res.ok) {
-          const users: UserType[] = await res.json();
-          const existingUser = users.find(u => u.phone === phoneNumber || u.nrc === nrcNumber);
-          if (existingUser) {
-            alert('Your information has registered in our system, please login.');
-            onCancel(); // Close registration and let them login
-            return;
-          }
+        if (!res.ok) {
+          alert('Server connection error. Please try again later.');
+          return;
+        }
+        const users: UserType[] = await res.json();
+        const existingUser = users.find(u => u.phone === phoneNumber || u.nrc === nrcNumber);
+        if (existingUser) {
+          alert('Your information is already registered in our system, please log in.');
+          onCancel(); // Close registration and let them login
+          return;
         }
       } catch (e) {
         console.error('Error checking existing user:', e);
-        const storedUsers: UserType[] = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
-        const existingUser = storedUsers.find(u => u.phone === phoneNumber || u.nrc === nrcNumber);
-        if (existingUser) {
-          alert('Your information has registered in our system, please login.');
-          onCancel();
-          return;
-        }
+        alert('Server connection error. Please try again later.');
+        return;
       }
 
       setStep('otp');
@@ -205,16 +203,28 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
       selfiePhoto: selfiePhoto || undefined,
       passportPhoto: passportPhoto || undefined,
       balance: 0,
-      isVerified: false
+      isVerified: true
     };
 
     try {
+      // Always save to Local Storage first for redundancy
+      const existingUsers = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
+      // Check if user already exists in local storage to prevent duplicates
+      const isDuplicate = existingUsers.some((u: UserType) => u.phone === newUser.phone);
+      if (!isDuplicate) {
+        localStorage.setItem('moneylink_users', JSON.stringify([...existingUsers, newUser]));
+      }
+
       // Save to backend
-      await fetch('/api/users', {
+      const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser)
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to save user to server');
+      }
 
       // Send Welcome Notification via API
       await fetch('/api/notifications', {
@@ -245,10 +255,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
       onComplete(newUser);
     } catch (error) {
       console.error('Failed to register user on backend, falling back to local storage:', error);
-      const existingUsers = JSON.parse(localStorage.getItem('moneylink_users') || '[]');
-      localStorage.setItem('moneylink_users', JSON.stringify([...existingUsers, newUser]));
       
-      // Send Welcome Notification
+      // Save Notification locally if API failed
       const notifications = JSON.parse(localStorage.getItem('moneylink_notifications') || '[]');
       notifications.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -260,8 +268,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
         type: 'system'
       });
       localStorage.setItem('moneylink_notifications', JSON.stringify(notifications));
-      
-      // Notify Admin
+
+      // Save Admin Notification locally
       const adminNotifications = JSON.parse(localStorage.getItem('moneylink_admin_notifications') || '[]');
       adminNotifications.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -408,7 +416,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
                   </p>
                   {generatedOtp && (
                     <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold text-center border border-blue-200">
-                      Test OTP: {generatedOtp}
+                      OTP: {generatedOtp}
                     </div>
                   )}
                 </div>
@@ -529,12 +537,6 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
                       </span>
                     </div>
                   </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                    <span className="font-bold">Activation Requirement:</span> KYC must be submitted to the SIM registering to activate your account features.
-                  </p>
                 </div>
                 <button 
                   onClick={handlePasswordSubmit}
@@ -744,13 +746,23 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onComplete, onCance
                     {appConfig.name} uses bank-grade encryption to protect your personal data. Your data is only used for verification.
                   </p>
                 </div>
-                <button 
-                  onClick={handleComplete}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all"
-                >
-                  Go to Dashboard
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleComplete}
+                    className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all"
+                  >
+                    Go to Dashboard
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                  {onSwitchToLogin && (
+                    <button 
+                      onClick={onSwitchToLogin}
+                      className="w-full bg-white text-green-700 border border-green-700 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all"
+                    >
+                      Login to Account
+                    </button>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

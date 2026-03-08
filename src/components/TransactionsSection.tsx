@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Filter } from 'lucide-react';
+import { ArrowLeft, Filter, Download } from 'lucide-react';
 import { Transaction } from '../types';
 import DataList from './DataList';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface TransactionsSectionProps {
   onBack: () => void;
@@ -15,6 +17,33 @@ const TransactionsSection: React.FC<TransactionsSectionProps> = ({ onBack, curre
   
   const [filterType, setFilterType] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('all');
+
+  const downloadStatement = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text('Transaction Statement', 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Account Holder: ${currentUser?.name}`, 14, 36);
+    doc.text(`Phone: +260 ${currentUser?.phone}`, 14, 42);
+
+    const tableData = filteredTransactions.map(tx => [
+      new Date(tx.date).toLocaleDateString(),
+      tx.type.toUpperCase(),
+      tx.title,
+      `K ${tx.amount.toLocaleString()}`,
+      tx.status.toUpperCase()
+    ]);
+
+    (doc as any).autoTable({
+      head: [['Date', 'Type', 'Description', 'Amount', 'Status']],
+      body: tableData,
+      startY: 50,
+      headStyles: { fillColor: [21, 128, 61] }
+    });
+
+    doc.save(`moneylink_statement_${new Date().getTime()}.pdf`);
+  };
 
   useEffect(() => {
     if (!currentUser) return;
@@ -82,6 +111,16 @@ const TransactionsSection: React.FC<TransactionsSectionProps> = ({ onBack, curre
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-[#666] text-sm">Your complete transaction history.</p>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button 
+          onClick={downloadStatement}
+          className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl font-bold text-sm hover:bg-green-800 transition-colors shadow-lg shadow-green-700/20"
+        >
+          <Download className="w-4 h-4" />
+          Download Statement
+        </button>
       </div>
 
       <div className="bg-white p-6 rounded-[2rem] border border-[#E5E5E5] shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">

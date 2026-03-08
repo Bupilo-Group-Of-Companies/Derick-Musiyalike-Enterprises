@@ -408,6 +408,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
             setShowRegFlow(false);
           }}
           onCancel={() => setShowRegFlow(false)}
+          onSwitchToLogin={() => {
+            setShowRegFlow(false);
+            setShowLoginFlow(true);
+          }}
         />
       )}
 
@@ -547,7 +551,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
       </AnimatePresence>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <QuickActionButton icon={Smartphone} label="Scan to Pay" onClick={() => onNavigate('digital-services')} />
         <QuickActionButton icon={Wallet} label="Top Up Wallet" onClick={() => onNavigate('account')} />
         <QuickActionButton icon={Target} label="Share & Earn" onClick={handleReferAndEarn} />
@@ -616,9 +620,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
             </div>
             <motion.button 
               whileTap={{ scale: 0.95 }}
+              onClick={() => setShowRepayModal(true)}
               className="bg-green-700 hover:bg-green-600 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all shadow-xl shadow-green-900/40 border border-green-600/50"
             >
-              ADD FUNDS <Plus className="w-4 h-4" />
+              REPAY LOAN <CreditCard className="w-4 h-4" />
             </motion.button>
           </div>
         </div>
@@ -629,7 +634,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
       </motion.div>
 
       {/* Primary Actions Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {primaryActions.map((action) => (
           <button
             key={action.id}
@@ -655,8 +660,6 @@ const Home: React.FC<HomeProps> = ({ onNavigate, currentUser, onRegister, onLogi
           WhatsApp: +260 777382032
         </a>
       </div>
-
-      <SupportChat currentUser={currentUser} role="user" config={config} />
     </div>
   );
 };

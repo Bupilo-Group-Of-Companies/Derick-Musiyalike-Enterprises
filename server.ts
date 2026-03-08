@@ -267,6 +267,27 @@ async function startServer() {
     res.status(201).json(newAgent);
   });
 
+  app.put('/api/agents/:id', (req, res) => {
+    const db = readDb();
+    const agentId = req.params.id;
+    const index = db.agents.findIndex((a: any) => a.id === agentId || a.id.toString() === agentId);
+    if (index !== -1) {
+      db.agents[index] = { ...db.agents[index], ...req.body };
+      writeDb(db);
+      res.json(db.agents[index]);
+    } else {
+      res.status(404).json({ message: 'Agent not found' });
+    }
+  });
+
+  app.delete('/api/agents/:id', (req, res) => {
+    const db = readDb();
+    const agentId = req.params.id;
+    db.agents = db.agents.filter((a: any) => a.id !== agentId && a.id.toString() !== agentId);
+    writeDb(db);
+    res.status(204).send();
+  });
+
   // Meeting routes
   app.get('/api/meetings', (req, res) => {
     const db = readDb();
